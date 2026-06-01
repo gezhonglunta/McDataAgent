@@ -104,7 +104,7 @@
                     v-model="agentForm.prompt"
                     :rows="4"
                     type="textarea"
-                    placeholder="请输入智能体Prompt"
+                    placeholder="请输入业务领域相关的知识，以便大模型更好的理解业务。"
                     size="large"
                   />
                 </div>

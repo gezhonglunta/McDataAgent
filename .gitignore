@@ -63,3 +63,4 @@ uploads/*
 # spring-ai-alibaba source
 spring-ai-alibaba-1.1.0.0/
 .mvn
+./data-agent-frontend/package-lock.json
