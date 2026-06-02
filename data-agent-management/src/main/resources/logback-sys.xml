@@ -12,17 +12,41 @@
         </encoder>
     </appender>
 
-    <!-- FileAppender：把日志写入文件（不做滚动） -->
-    <appender name="file" class="ch.qos.logback.core.FileAppender">
+    <!-- 主日志按天滚动输出 -->
+    <appender name="file" class="ch.qos.logback.core.rolling.RollingFileAppender">
         <file>logs/data-agent-management.log</file>
         <append>true</append>
         <encoder>
             <pattern>${log.pattern}</pattern>
             <charset>UTF-8</charset>
         </encoder>
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <fileNamePattern>logs/data-agent-management.%d{yyyy-MM-dd}.log</fileNamePattern>
+            <maxHistory>${MAX_HISTORY}</maxHistory>
+        </rollingPolicy>
+    </appender>
+
+    <!-- VectorStore日志单独按大小滚动输出 -->
+    <appender name="vectorStoreFile" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>logs/vectorStore.log</file>
+        <encoder>
+            <pattern>${log.pattern}</pattern>
+            <charset>UTF-8</charset>
+        </encoder>
+        <rollingPolicy class="ch.qos.logback.core.rolling.FixedWindowRollingPolicy">
+            <fileNamePattern>logs/vectorStore.%i.log</fileNamePattern>
+            <minIndex>1</minIndex>
+            <maxIndex>1</maxIndex>
+        </rollingPolicy>
+        <triggeringPolicy class="ch.qos.logback.core.rolling.SizeBasedTriggeringPolicy">
+            <maxFileSize>10MB</maxFileSize>
+        </triggeringPolicy>
     </appender>
 
     <!-- 日志级别 -->
+    <logger name="org.springframework.ai.vectorstore.SimpleVectorStore" level="info" additivity="false">
+        <appender-ref ref="vectorStoreFile" />
+    </logger>
     <logger name="com.alibaba.cloud.ai.dataagent.service" level="info" />
     <logger name="com.alibaba.cloud.ai.dataagent.workflow.node" level="info" />
     <logger name="com.alibaba.cloud.ai.mapper" level="info" />
@@ -30,7 +54,11 @@
 
     <!-- 控制台输出日志级别 -->
     <root level="info">
-        <appender-ref ref="stdout"/>
+        <if condition='"ide".equals(property("RUN_MODE"))'>
+            <then>
+                <appender-ref ref="stdout"/>
+            </then>
+        </if>
         <appender-ref ref="file"/>
     </root>
 </included>
