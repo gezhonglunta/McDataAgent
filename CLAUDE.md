@@ -150,6 +150,11 @@ Native MCP protocol support for integration with Claude Desktop:
 
 ## Development Notes
 
+### Java Code Style
+
+- Line delimiters are Linux style (\n)
+- Use tabs instead of 4 spaces
+
 ### Environment Profiles
 
 - `application.yml` - MySQL configuration (production)
