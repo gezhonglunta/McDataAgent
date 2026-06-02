@@ -29,8 +29,8 @@ spring:
     alibaba:
       data-agent:
         vector-store:
-          table-topk-limit: 10
-          table-similarity-threshold: 0.2
+          table-topk-limit: 1000
+          table-similarity-threshold: 0.5
           default-topk-limit: 8
           default-similarity-threshold: 0.4
         llm-service-type: stream
@@ -66,16 +66,7 @@ spring:
       enabled: true
 
 mybatis:
-
   configuration:
     map-underscore-to-camel-case: true
     log-impl: org.apache.ibatis.logging.slf4j.Slf4jImpl
-
-# 日志配置
-logging:
-  level:
-    com.alibaba.cloud.ai.dataagent.service: debug
-    com.alibaba.cloud.ai.dataagent.workflow.node: debug
-    com.alibaba.cloud.ai.mapper: debug
-    org.springframework.jdbc: debug
 

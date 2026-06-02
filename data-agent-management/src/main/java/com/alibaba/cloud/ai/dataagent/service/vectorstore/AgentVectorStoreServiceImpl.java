@@ -92,6 +92,22 @@ public class AgentVectorStoreServiceImpl implements AgentVectorStoreService {
 	}
 
 	@Override
+	public List<Document> search(SearchRequest searchRequest) {
+		Assert.notNull(searchRequest, "SearchRequest cannot be null.");
+		HybridSearchRequest hybridRequest = HybridSearchRequest.builder()
+			.query(searchRequest.getQuery())
+			.topK(searchRequest.getTopK())
+			.similarityThreshold(searchRequest.getSimilarityThreshold())
+			.filterExpression(searchRequest.getFilterExpression())
+			.build();
+
+		if (dataAgentProperties.getVectorStore().isEnableHybridSearch() && hybridRetrievalStrategy.isPresent()) {
+			return hybridRetrievalStrategy.get().retrieve(hybridRequest);
+		}
+		return vectorStore.similaritySearch(searchRequest);
+	}
+
+	@Override
 	public Boolean deleteDocumentsByVectorType(String agentId, String vectorType) throws Exception {
 		Assert.notNull(agentId, "AgentId cannot be null.");
 		Assert.notNull(vectorType, "VectorType cannot be null.");
