@@ -10,27 +10,27 @@ set local_frontend_dist=%local_frontend%\dist
 set local_jar=.\data-agent-management\target\spring-ai-alibaba-data-agent-management-1.0.0-SNAPSHOT.jar
 
 if exist %local_frontend_dist% (
-    echo åŒæ­¥å‰ç«¯æ–‡ä»¶
+    echo Í¬²½Ç°¶ËÎÄ¼ş
     ssh -p %port% root@%host% "rm -rf %remote_frontend%/dist"
     scp -P %port% -r %local_frontend_dist% root@%host%:%remote_frontend%/
 ) else (
-    echo å‰ç«¯distç›®å½•ä¸å­˜åœ¨ï¼Œè·³è¿‡åŒæ­¥å‰ç«¯æ–‡ä»¶
+    echo Ç°¶ËdistÄ¿Â¼²»´æÔÚ£¬Ìø¹ıÍ¬²½Ç°¶ËÎÄ¼ş
 )
 
 if not exist %local_jar% (
-    echo å‘å¸ƒåŒ…ä¸å­˜åœ¨
+    echo ·¢²¼°ü²»´æÔÚ
     exit /B
 )
 
-echo åœæ­¢æœåŠ¡
+echo Í£Ö¹·şÎñ
 ssh -p %port% root@%host% "cd %remote_backend% && sh stop.sh"
 timeout /t 60
-echo æŸ¥çœ‹ç«¯å£å ç”¨ï¼š
+echo ²é¿´¶Ë¿ÚÕ¼ÓÃ£º
 ssh -p %port% root@%host% "netstat -ntlp | grep 8065"
 
 scp -P %port% %local_jar% root@%host%:%remote_backend%
 
-echo å¼€å¯æœåŠ¡
+echo ¿ªÆô·şÎñ
 ssh -p %port% root@%host% "cd %remote_backend% && sh start.sh"
 
 pause
