@@ -218,19 +218,20 @@ public class McDatasourceServiceImpl implements McDatasourceService {
 		String dict = """
 				# Table: sy_dict, 系统数据字典表
 				[
-				(value:TEXT, , Examples: [默认查询数据,是否显示标题,控制数据权限]),
-				(code:TEXT, , Examples: [IS_DEF_QUERY,IS_TITLE_ATTR,IS_DATA_AUTH]),
-				(remark:TEXT, , Examples: [默认是1 否2]),
-				(dict_id:TEXT, , Primary Key, Examples: [7ffd01666a18e17b62a431b82a8e9282,a762b97ef911418fbe989876718339d7])
+				(value:TEXT, 字典名称，用于展示 , Examples: [默认查询数据,是否显示标题,控制数据权限]),
+				(code:TEXT, 字典编码 , Examples: [IS_DEF_QUERY,IS_TITLE_ATTR,IS_DATA_AUTH]),
+				(scope:TEXT, 字典级别：0-系统级，1-平台级，2-业务级 , Examples: [0,1]),
+				(remark:TEXT, 字典备注 , Examples: [默认是1 否2]),
+				(dict_id:TEXT, 字典id , Primary Key, Examples: [7ffd01666a18e17b62a431b82a8e9282,a762b97ef911418fbe989876718339d7])
 				]
 				""";
 		String dictVal = """
 				# Table: sy_dict_val, 系统数据字典值表
 				[
-				(value:TEXT, , Examples: [烤箱,否,082009]),
-				(code:TEXT, , Examples: [KX,2,082009]),
-				(dict_id:TEXT, , Examples: [64ecb845083a47929a5920294fdbb305,87bb4b1c8a3141f584f7757eb58eaf03]),
-				(dict_val_id:TEXT, , Primary Key, Examples: [fe6e635a4afe4725b30eac8a73bdd09a,18c23300cd344f1da99b7912c7626880])
+				(value:TEXT, 字典值名称，用于展示 , Examples: [烤箱,否,082009]),
+				(code:TEXT, 字典值编码 , Examples: [KX,2,082009]),
+				(dict_id:TEXT, 字典id , Examples: [64ecb845083a47929a5920294fdbb305,87bb4b1c8a3141f584f7757eb58eaf03]),
+				(dict_val_id:TEXT, 字典值id , Primary Key, Examples: [fe6e635a4afe4725b30eac8a73bdd09a,18c23300cd344f1da99b7912c7626880])
 				]
 				""";
 		StringBuilder sb = new StringBuilder(schemaInfo);
