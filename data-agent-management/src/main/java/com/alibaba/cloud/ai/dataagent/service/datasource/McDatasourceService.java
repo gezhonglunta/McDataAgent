@@ -41,4 +41,6 @@ public interface McDatasourceService {
 	String extBuildSemanticConsistenPrompt(String schemaInfo);
 
 	void extBuildSemanticModelPrompt(List<SemanticModel> semanticModels, Map<String, Object> params);
+
+	String filterColumnDescription(String description, String columnName, String tableName);
 }
