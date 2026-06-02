@@ -21,6 +21,8 @@ import com.alibaba.cloud.ai.dataagent.bo.schema.TableInfoBO;
 import com.alibaba.cloud.ai.dataagent.constant.Constant;
 import com.alibaba.cloud.ai.dataagent.constant.DocumentMetadataConstant;
 import com.alibaba.cloud.ai.dataagent.enums.BizDataSourceTypeEnum;
+import com.alibaba.cloud.ai.dataagent.service.ApplicationContextHelper;
+import com.alibaba.cloud.ai.dataagent.service.datasource.McDatasourceService;
 import com.alibaba.cloud.ai.dataagent.util.JsonUtil;
 import com.alibaba.cloud.ai.dataagent.properties.DataAgentProperties;
 import com.alibaba.cloud.ai.dataagent.connector.accessor.Accessor;
@@ -155,6 +157,8 @@ public class SchemaServiceImpl implements SchemaService {
 			log.debug("Fetching tables for datasource: {}", datasourceId);
 			List<TableInfoBO> tables = dbAccessor.fetchTables(config, dqp);
 			log.info("Found  tables for datasource: {}", tables.size(), datasourceId);
+			//补全mc表信息
+			ApplicationContextHelper.getBean(McDatasourceService.class).filterMcInfo(config, dbAccessor, tables);
 
 			if (tables.size() > 5) {
 				// 对于大量表，使用并行处理
