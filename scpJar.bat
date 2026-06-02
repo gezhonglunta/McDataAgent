@@ -1,30 +1,36 @@
 @echo off
 
-set local_file=.\data-agent-management\target\spring-ai-alibaba-data-agent-management-1.0.0-SNAPSHOT.jar
-set remote_path=/appdata/dataAgent/data-agent-management
 set host=190.160.13.13
 set port=20030
+set remote_base=/appdata/dataAgent
+set remote_frontend=%remote_base%/data-agent-frontend
+set remote_backend=%remote_base%/data-agent-management
+set local_frontend=.\data-agent-frontend
+set local_frontend_dist=%local_frontend%\dist
+set local_jar=.\data-agent-management\target\spring-ai-alibaba-data-agent-management-1.0.0-SNAPSHOT.jar
 
-echo Í¬²½Ç°¶ËÎÄ¼ş
-ssh -p %port% root@%host% "rm -rf /appdata/dataAgent/data-agent-frontend/dist"
-cd .\data-agent-frontend\
-scp -P %port% -r dist root@%host%:/appdata/dataAgent/data-agent-frontend/
-cd ..
+if exist %local_frontend_dist% (
+    echo åŒæ­¥å‰ç«¯æ–‡ä»¶
+    ssh -p %port% root@%host% "rm -rf %remote_frontend%/dist"
+    scp -P %port% -r %local_frontend_dist% root@%host%:%remote_frontend%/
+) else (
+    echo å‰ç«¯distç›®å½•ä¸å­˜åœ¨ï¼Œè·³è¿‡åŒæ­¥å‰ç«¯æ–‡ä»¶
+)
 
-if not exist %local_file% (
-    echo ·¢²¼°ü²»´æÔÚ
+if not exist %local_jar% (
+    echo å‘å¸ƒåŒ…ä¸å­˜åœ¨
     exit /B
 )
 
-echo Í£Ö¹·şÎñ
-ssh -p %port% root@%host% "cd %remote_path% && sh stop.sh"
+echo åœæ­¢æœåŠ¡
+ssh -p %port% root@%host% "cd %remote_backend% && sh stop.sh"
 timeout /t 60
-echo ²é¿´¶Ë¿ÚÕ¼ÓÃ£º
+echo æŸ¥çœ‹ç«¯å£å ç”¨ï¼š
 ssh -p %port% root@%host% "netstat -ntlp | grep 8065"
 
-scp -P %port% %local_file% root@%host%:%remote_path%
+scp -P %port% %local_jar% root@%host%:%remote_backend%
 
-echo ¿ªÆô·şÎñ
-ssh -p %port% root@%host% "cd %remote_path% && sh start.sh"
+echo å¼€å¯æœåŠ¡
+ssh -p %port% root@%host% "cd %remote_backend% && sh start.sh"
 
 pause
