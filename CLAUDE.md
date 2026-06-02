@@ -8,33 +8,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ```bash
 # Build project (skip tests)
-make build
-# or
-./mvnw clean package -DskipTests=true
-
-# Run tests
-make test
-# or
-./mvnw test
-
-# Run specific test class
-./mvnw test -Dtest=YourTestClass
+mvn clean package -Dmaven.test.skip=true
 
 # Run backend server (use H2 for development)
 cd data-agent-management
-./mvnw spring-boot:run -Dspring-boot.run.profiles=h2
+mvn spring-boot:run
 
-# Code formatting
-make format-fix
-./mvnw spring-javaformat:apply
+mvn spring-javaformat:apply
 
-# Check format
-make format-check
-./mvnw spring-javaformat:validate
-
-# Checkstyle
-make checkstyle-check
-./mvnw checkstyle:check
+mvn spring-javaformat:validate
 ```
 
 ### Frontend (Vue 3 / Vite)

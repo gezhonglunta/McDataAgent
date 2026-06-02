@@ -30,7 +30,9 @@ import com.alibaba.cloud.ai.dataagent.enums.ErrorCodeEnum;
 import com.alibaba.cloud.ai.dataagent.mapper.AgentDatasourceMapper;
 import com.alibaba.cloud.ai.dataagent.mapper.DatasourceMapper;
 import com.alibaba.cloud.ai.dataagent.mapper.LogicalRelationMapper;
+import com.alibaba.cloud.ai.dataagent.service.ApplicationContextHelper;
 import com.alibaba.cloud.ai.dataagent.service.datasource.DatasourceService;
+import com.alibaba.cloud.ai.dataagent.service.datasource.McDatasourceService;
 import com.alibaba.cloud.ai.dataagent.service.datasource.handler.DatasourceTypeHandler;
 import com.alibaba.cloud.ai.dataagent.service.datasource.handler.registry.DatasourceTypeHandlerRegistry;
 import java.util.ArrayList;
@@ -240,10 +242,13 @@ public class DatasourceServiceImpl implements DatasourceService {
 		Accessor dbAccessor = accessorFactory.getAccessorByDbConfig(dbConfig);
 		List<TableInfoBO> tableInfoList = dbAccessor.showTables(dbConfig, queryParam);
 
+		Set<String> mcTableNames = ApplicationContextHelper.getBean(McDatasourceService.class).mcBussTableNames(dbConfig, dbAccessor);
+
 		// Extract table names
 		List<String> tableNames = tableInfoList.stream()
 			.map(TableInfoBO::getName)
 			.filter(name -> name != null && !name.trim().isEmpty())
+			.filter(name -> mcTableNames.contains(name.toLowerCase()))
 			.sorted()
 			.toList();
 

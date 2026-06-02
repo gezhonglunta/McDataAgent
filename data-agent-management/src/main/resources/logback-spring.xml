@@ -1,0 +1,15 @@
+<!-- scan：设置为true时，配置文件如果发生改变，将会被重新加载 -->
+<!-- scanPeriod：设置监测配置文件是否修改的时间间隔 -->
+<configuration scan="true" scanPeriod="60 seconds">
+    <!-- 文件保留天数 -->
+    <property scope="local" name="MAX_HISTORY" value="30" />
+    <!-- 单个文件最大大小 -->
+    <property scope="local" name="MAX_FILE_SIZE" value="50MB" />
+    <!-- 总文件最大大小 -->
+    <property scope="local" name="TOTAL_SIZE_CAP" value="5GB" />
+    <!-- 日志格式 -->
+    <property name="log.pattern" value="%d %p [%thread] %X{mcInfo}  (%file:%line\)- %m%n"/>
+
+    <!-- 系统默认日志输出，更新的时候会覆盖 -->
+    <include resource="logback-sys.xml" />
+</configuration>

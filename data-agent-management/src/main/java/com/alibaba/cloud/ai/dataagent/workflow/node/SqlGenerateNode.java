@@ -17,6 +17,8 @@ package com.alibaba.cloud.ai.dataagent.workflow.node;
 
 import com.alibaba.cloud.ai.dataagent.dto.planner.ExecutionStep;
 import com.alibaba.cloud.ai.dataagent.enums.TextType;
+import com.alibaba.cloud.ai.dataagent.mapper.AgentDatasourceMapper;
+import com.alibaba.cloud.ai.dataagent.service.ApplicationContextHelper;
 import com.alibaba.cloud.ai.dataagent.util.ChatResponseUtil;
 import com.alibaba.cloud.ai.dataagent.util.FluxUtil;
 import com.alibaba.cloud.ai.dataagent.util.PlanProcessUtil;
@@ -134,6 +136,14 @@ public class SqlGenerateNode implements NodeAction {
 		SchemaDTO schemaDTO = StateUtil.getObjectValue(state, TABLE_RELATION_OUTPUT, SchemaDTO.class);
 		String userQuery = StateUtil.getCanonicalQuery(state);
 		String dialect = StateUtil.getStringValue(state, DB_DIALECT_TYPE);
+		String agentId = StateUtil.getStringValue(state, AGENT_ID);
+
+		// 查询 Agent 的激活数据源
+		AgentDatasourceMapper agentDatasourceMapper= ApplicationContextHelper.getBean(AgentDatasourceMapper.class);
+		Integer datasourceId = agentDatasourceMapper.selectActiveDatasourceIdByAgentId(Long.valueOf(agentId));
+		if (datasourceId == null) {
+			log.warn("Agent {} has no active datasource, using default value", agentId);
+		}
 
 		SqlGenerationDTO sqlGenerationDTO = SqlGenerationDTO.builder()
 			.evidence(evidence)
@@ -143,6 +153,7 @@ public class SqlGenerateNode implements NodeAction {
 			.exceptionMessage(errorMsg)
 			.executionDescription(executionDescription)
 			.dialect(dialect)
+			.datasourceId(datasourceId)
 			.build();
 
 		return nl2SqlService.generateSql(sqlGenerationDTO);

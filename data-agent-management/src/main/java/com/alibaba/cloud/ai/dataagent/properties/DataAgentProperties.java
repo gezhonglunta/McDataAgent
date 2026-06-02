@@ -26,7 +26,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 @ConfigurationProperties(prefix = Constant.PROJECT_PROPERTIES_PREFIX)
 public class DataAgentProperties {
 
-	private LlmServiceEnum llmServiceType = LlmServiceEnum.STREAM;
+	private LlmServiceEnum llmServiceType = LlmServiceEnum.BLOCK;
 
 	/**
 	 * spring.ai.alibaba.data-agent.embedding-batch.encoding-type=cl100k_base
@@ -76,9 +76,9 @@ public class DataAgentProperties {
 	private boolean enableSqlResultChart = true;
 
 	/**
-	 * 执行SQL结果图表化超时时间，默认3000ms
+	 * 执行SQL结果图表化超时时间，默认30000ms (30秒)
 	 */
-	private Long enrichSqlResultTimeout = 3000L;
+	private Long enrichSqlResultTimeout = 30000L;
 
 	@Getter
 	@Setter

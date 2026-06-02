@@ -34,7 +34,7 @@ public class SqlExecutor {
 
 	public static final Integer RESULT_SET_LIMIT = 1000;
 
-	public static final Integer STATEMENT_TIMEOUT = 30;
+	public static final Integer STATEMENT_TIMEOUT = 60;
 
 	/**
 	 * Execute SQL query and return structured results (with column information)

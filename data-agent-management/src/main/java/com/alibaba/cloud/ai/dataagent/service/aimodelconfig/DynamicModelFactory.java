@@ -35,6 +35,7 @@ import org.springframework.ai.openai.api.OpenAiApi;
 import org.springframework.ai.retry.RetryUtils;
 import org.springframework.http.client.HttpComponentsClientHttpRequestFactory;
 import org.springframework.http.client.reactive.ReactorClientHttpConnector;
+import org.springframework.retry.support.RetryTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.util.Assert;
 import org.springframework.util.StringUtils;
@@ -79,7 +80,7 @@ public class DynamicModelFactory {
 			.streamUsage(true)
 			.build();
 		// 4. 返回统一的 OpenAiChatModel
-		return OpenAiChatModel.builder().openAiApi(openAiApi).defaultOptions(openAiChatOptions).build();
+		return OpenAiChatModel.builder().openAiApi(openAiApi).defaultOptions(openAiChatOptions).retryTemplate(RetryTemplate.builder().maxAttempts(1).build()).build();
 	}
 
 	/**

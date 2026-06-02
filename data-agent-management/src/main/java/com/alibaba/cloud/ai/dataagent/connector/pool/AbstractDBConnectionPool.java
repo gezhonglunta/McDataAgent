@@ -110,8 +110,9 @@ public abstract class AbstractDBConnectionPool implements DBConnectionPool {
 							druidDataSource.getActiveCount() + druidDataSource.getPoolingCount(),
 							druidDataSource.getWaitThreadCount());
 				}
-
-				return dataSource.getConnection();
+				Connection conn = dataSource.getConnection();
+				conn.setReadOnly(true);
+				return conn;
 			}
 			catch (Exception e) {
 				log.warn("Attempt {} to get database connection failed: {}", attempt, e.getMessage());

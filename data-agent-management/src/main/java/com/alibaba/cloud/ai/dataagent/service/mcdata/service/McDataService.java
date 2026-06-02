@@ -1,5 +1,5 @@
 /*
- * Copyright 2024-2026 the original author or authors.
+ * Copyright 2026 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,32 +13,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.alibaba.cloud.ai.dataagent.dto.prompt;
+package com.alibaba.cloud.ai.dataagent.service.mcdata.service;
 
-import com.alibaba.cloud.ai.dataagent.dto.schema.SchemaDTO;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
+import com.alibaba.cloud.ai.dataagent.service.mcdata.model.McDict;
 
-@AllArgsConstructor
-@Builder
-@Data
-public class SqlGenerationDTO {
+import java.util.List;
 
-	private String evidence;
-
-	private String query;
-
-	private SchemaDTO schemaDTO;
-
-	private String sql;
-
-	private String exceptionMessage;
-
-	private String executionDescription;
-
-	private String dialect;
-
-	private Integer datasourceId;
-
+/**
+ * @author 张华
+ */
+public interface McDataService {
+    List<McDict> listDict(Integer datasourceId, String dictName);
 }
