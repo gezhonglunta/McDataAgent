@@ -21,7 +21,7 @@ import modelConfigService from '@/services/modelConfig';
 
 // 创建路由实例
 const router = createRouter({
-  history: createWebHistory(),
+  history: createWebHistory(import.meta.env.BASE_URL),
   routes,
   scrollBehavior(to, from, savedPosition) {
     // 路由切换时滚动到顶部

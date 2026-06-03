@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+import { apiUrl } from './common';
 
 export interface GraphRequest {
   agentId: string;
@@ -76,7 +77,7 @@ class GraphService {
       params.append('humanFeedbackContent', request.humanFeedbackContent);
     }
 
-    const url = `${API_BASE_URL}/stream/search?${params.toString()}`;
+    const url = apiUrl(`${API_BASE_URL}/stream/search?${params.toString()}`);
 
     const eventSource = new EventSource(url);
 

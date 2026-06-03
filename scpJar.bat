@@ -31,6 +31,6 @@ ssh -p %port% root@%host% "netstat -ntlp | grep 8065"
 scp -P %port% %local_jar% root@%host%:%remote_backend%
 
 echo ¿ªÆô·þÎñ
-ssh -p %port% root@%host% "cd %remote_backend% && sh start.sh"
+ssh -p %port% root@%host% "cd %remote_backend% && sh start_sso.sh"
 
 pause

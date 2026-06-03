@@ -23,40 +23,44 @@ import java.util.List;
  * @author 张华
  */
 public class McDict {
-    /**
-     * 数据字典编码，通常用于程序的存储值使用
-     */
-    private String dictCode;
-    /**
-     * 数据字典名称，通常用于程序的展示值使用
-     */
-    private String dictName;
-    /**
-     * 数据字典项列表
-     */
-    private List<McDictItem> items;
 
-    public String getDictCode() {
-        return dictCode;
-    }
+	/**
+	 * 数据字典编码，通常用于程序的存储值使用
+	 */
+	private String dictCode;
 
-    public void setDictCode(String dictCode) {
-        this.dictCode = dictCode;
-    }
+	/**
+	 * 数据字典名称，通常用于程序的展示值使用
+	 */
+	private String dictName;
 
-    public String getDictName() {
-        return dictName;
-    }
+	/**
+	 * 数据字典项列表
+	 */
+	private List<McDictItem> items;
 
-    public void setDictName(String dictName) {
-        this.dictName = dictName;
-    }
+	public String getDictCode() {
+		return dictCode;
+	}
 
-    public List<McDictItem> getItems() {
-        return items;
-    }
+	public void setDictCode(String dictCode) {
+		this.dictCode = dictCode;
+	}
 
-    public void setItems(List<McDictItem> items) {
-        this.items = items;
-    }
+	public String getDictName() {
+		return dictName;
+	}
+
+	public void setDictName(String dictName) {
+		this.dictName = dictName;
+	}
+
+	public List<McDictItem> getItems() {
+		return items;
+	}
+
+	public void setItems(List<McDictItem> items) {
+		this.items = items;
+	}
+
 }

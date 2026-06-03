@@ -23,5 +23,7 @@ import java.util.List;
  * @author 张华
  */
 public interface McDataService {
-    List<McDict> listDict(Integer datasourceId, String dictName);
+
+	List<McDict> listDict(Integer datasourceId, String dictName);
+
 }

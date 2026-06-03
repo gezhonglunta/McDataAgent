@@ -33,6 +33,7 @@ import java.util.List;
 @Component
 @Slf4j
 public class ColumnDescriptionEnrichmentAspect {
+
 	@Autowired
 	private McDatasourceService mcDatasourceService;
 
@@ -63,4 +64,5 @@ public class ColumnDescriptionEnrichmentAspect {
 			column.setDescription(mcDatasourceService.filterColumnDescription(original, column.getName(), tableName));
 		}
 	}
+
 }

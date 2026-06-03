@@ -53,6 +53,10 @@ spring:
             bucket-name: ${OSS_BUCKET_NAME:}
             custom-domain: ${OSS_CUSTOM_DOMAIN:}
         max-sql-retry-count: 10
+        auth:
+          enabled: ${DATA_AGENT_AUTH_ENABLED:false}
+          jwt-claim-name: ${DATA_AGENT_JWT_CLAIM_NAME:sub}
+        base-path: ${DATA_AGENT_BASE_PATH:}
         # Langfuse 可观测性配置
         langfuse:
           enabled: ${LANGFUSE_ENABLED:false}

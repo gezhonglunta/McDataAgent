@@ -42,61 +42,66 @@ import java.util.Map;
 @Service
 @AllArgsConstructor
 public class McDataServiceImpl implements McDataService {
-    private final McDatasourceService mcDatasourceService;
-    private final DatasourceService datasourceService;
 
-    @Override
-    public List<McDict> listDict(Integer datasourceId, String dictName) {
-        if (datasourceId == -1) {
-            List<Datasource> allDatasource = datasourceService.getAllDatasource();
-            datasourceId = allDatasource.get(0).getId();
-        }
-        log.info("开始查询MC数据字典：{}#{}", datasourceId, dictName);
-        try {
-            DbConfigBO dbConfig = mcDatasourceService.getDbConfigByDatasourceId(datasourceId);
-            Accessor accessor = mcDatasourceService.getAccessorByDatasourceId(datasourceId);
-            DbQueryParameter queryParameter = DbQueryParameter.from(dbConfig);
-            String sql = """
-                    select d.code as dict_code,d.value as dict_name,dv.code as dict_item_code,dv.value as dict_item_name from sy_dict  d 
-                    inner join sy_dict_val dv on d.dict_id = dv.dict_id 
-                    where d.value like '%%%s%%' or  d.code like '%%%s%%'
-                    """;
-            queryParameter.setSql(String.format(sql, dictName, dictName));
-            queryParameter.setSchema(dbConfig.getSchema());
-            ResultSetBO resultSetBO;
-            try {
-                resultSetBO = accessor.executeSqlAndReturnObject(dbConfig, queryParameter);
-            } catch (Exception e) {
-                throw new RuntimeException("Failed to query MC metadata for datasource " + datasourceId + ": "
-                        + e.getMessage(), e);
-            }
-            List<Map<String, String>> rows = resultSetBO != null && resultSetBO.getData() != null ? resultSetBO.getData()
-                    : Collections.emptyList();
+	private final McDatasourceService mcDatasourceService;
 
-            Map<String, McDict> dictMap = new LinkedHashMap<>();
-            for (Map<String, String> row : rows) {
-                String dictCode = row.get("dict_code");
-                String currentDictName = row.get("dict_name");
-                String mapKey = dictCode + "_" + currentDictName;
+	private final DatasourceService datasourceService;
 
-                McDict dict = dictMap.computeIfAbsent(mapKey, key -> {
-                    McDict item = new McDict();
-                    item.setDictCode(dictCode);
-                    item.setDictName(currentDictName);
-                    item.setItems(new java.util.ArrayList<>());
-                    return item;
-                });
+	@Override
+	public List<McDict> listDict(Integer datasourceId, String dictName) {
+		if (datasourceId == -1) {
+			List<Datasource> allDatasource = datasourceService.getAllDatasource();
+			datasourceId = allDatasource.get(0).getId();
+		}
+		log.info("开始查询MC数据字典：{}#{}", datasourceId, dictName);
+		try {
+			DbConfigBO dbConfig = mcDatasourceService.getDbConfigByDatasourceId(datasourceId);
+			Accessor accessor = mcDatasourceService.getAccessorByDatasourceId(datasourceId);
+			DbQueryParameter queryParameter = DbQueryParameter.from(dbConfig);
+			String sql = """
+					select d.code as dict_code,d.value as dict_name,dv.code as dict_item_code,dv.value as dict_item_name from sy_dict  d
+					inner join sy_dict_val dv on d.dict_id = dv.dict_id
+					where d.value like '%%%s%%' or  d.code like '%%%s%%'
+					""";
+			queryParameter.setSql(String.format(sql, dictName, dictName));
+			queryParameter.setSchema(dbConfig.getSchema());
+			ResultSetBO resultSetBO;
+			try {
+				resultSetBO = accessor.executeSqlAndReturnObject(dbConfig, queryParameter);
+			}
+			catch (Exception e) {
+				throw new RuntimeException(
+						"Failed to query MC metadata for datasource " + datasourceId + ": " + e.getMessage(), e);
+			}
+			List<Map<String, String>> rows = resultSetBO != null && resultSetBO.getData() != null
+					? resultSetBO.getData() : Collections.emptyList();
 
-                McDictItem dictItem = new McDictItem();
-                dictItem.setDictItemCode(row.get("dict_item_code"));
-                dictItem.setDictItemName(row.get("dict_item_name"));
-                dict.getItems().add(dictItem);
-            }
-            log.info("查询MC数据字典：{}#{},共{}条", datasourceId, dictName, dictMap.size());
-            return List.copyOf(dictMap.values());
-        } catch (Exception e) {
-            log.error("查询MC数据字典失败：{}#{}", datasourceId, dictName, e);
-            return new ArrayList<>(0);
-        }
-    }
+			Map<String, McDict> dictMap = new LinkedHashMap<>();
+			for (Map<String, String> row : rows) {
+				String dictCode = row.get("dict_code");
+				String currentDictName = row.get("dict_name");
+				String mapKey = dictCode + "_" + currentDictName;
+
+				McDict dict = dictMap.computeIfAbsent(mapKey, key -> {
+					McDict item = new McDict();
+					item.setDictCode(dictCode);
+					item.setDictName(currentDictName);
+					item.setItems(new java.util.ArrayList<>());
+					return item;
+				});
+
+				McDictItem dictItem = new McDictItem();
+				dictItem.setDictItemCode(row.get("dict_item_code"));
+				dictItem.setDictItemName(row.get("dict_item_name"));
+				dict.getItems().add(dictItem);
+			}
+			log.info("查询MC数据字典：{}#{},共{}条", datasourceId, dictName, dictMap.size());
+			return List.copyOf(dictMap.values());
+		}
+		catch (Exception e) {
+			log.error("查询MC数据字典失败：{}#{}", datasourceId, dictName, e);
+			return new ArrayList<>(0);
+		}
+	}
+
 }

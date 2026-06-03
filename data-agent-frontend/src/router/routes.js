@@ -60,6 +60,16 @@ const routes = [
       module: 'agent',
     },
   },
+  {
+    path: '/user-agent/:id/run',
+    name: 'UserAgentRun',
+    component: () => import('@/views/AgentRun.vue'),
+    meta: {
+      title: '运行智能体',
+      module: 'agent',
+      hideHeader: true,
+    },
+  },
 
   // 模型配置模块
   {

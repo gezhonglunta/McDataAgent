@@ -15,7 +15,7 @@
  */
 
 import axios from 'axios';
-import { ApiResponse } from '@/services/common';
+import { ApiResponse, apiUrl } from '@/services/common';
 import { AgentDatasource } from '@/services/datasource';
 
 interface ToggleDatasourceDto {
@@ -28,7 +28,7 @@ interface UpdateDatasourceTablesDto {
   tables?: string[];
 }
 
-const BASE_URL_FUNC = (agentId: string) => `/api/agent/${agentId}/datasources`;
+const BASE_URL_FUNC = (agentId: string) => apiUrl(`/api/agent/${agentId}/datasources`);
 
 class AgentDatasourceService {
   /**

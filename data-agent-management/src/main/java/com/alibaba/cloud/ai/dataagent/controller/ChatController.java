@@ -23,6 +23,7 @@ import com.alibaba.cloud.ai.dataagent.service.chat.ChatSessionService;
 import com.alibaba.cloud.ai.dataagent.service.chat.SessionTitleService;
 import com.alibaba.cloud.ai.dataagent.util.ReportTemplateUtil;
 import com.alibaba.cloud.ai.dataagent.vo.ApiResponse;
+import com.alibaba.cloud.ai.dataagent.util.UserContextHolder;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -60,7 +61,8 @@ public class ChatController {
 	 */
 	@GetMapping("/agent/{id}/sessions")
 	public ResponseEntity<List<ChatSession>> getAgentSessions(@PathVariable(value = "id") Integer id) {
-		List<ChatSession> sessions = chatSessionService.findByAgentId(id);
+		String userId = UserContextHolder.getCurrentUserId();
+		List<ChatSession> sessions = chatSessionService.findByAgentId(id, userId);
 		return ResponseEntity.ok(sessions);
 	}
 
@@ -71,7 +73,7 @@ public class ChatController {
 	public ResponseEntity<ChatSession> createSession(@PathVariable(value = "id") Integer id,
 			@RequestBody(required = false) Map<String, Object> request) {
 		String title = request != null ? (String) request.get("title") : null;
-		Long userId = request != null ? (Long) request.get("userId") : null;
+		String userId = UserContextHolder.getCurrentUserId();
 
 		ChatSession session = chatSessionService.createSession(id, title, userId);
 		return ResponseEntity.ok(session);
@@ -82,7 +84,8 @@ public class ChatController {
 	 */
 	@DeleteMapping("/agent/{id}/sessions")
 	public ResponseEntity<ApiResponse> clearAgentSessions(@PathVariable(value = "id") Integer id) {
-		chatSessionService.clearSessionsByAgentId(id);
+		String userId = UserContextHolder.getCurrentUserId();
+		chatSessionService.clearSessionsByAgentId(id, userId);
 		return ResponseEntity.ok(ApiResponse.success("会话已清空"));
 	}
 
@@ -91,6 +94,9 @@ public class ChatController {
 	 */
 	@GetMapping("/sessions/{sessionId}/messages")
 	public ResponseEntity<List<ChatMessage>> getSessionMessages(@PathVariable(value = "sessionId") String sessionId) {
+		if (!canAccessSession(sessionId)) {
+			return ResponseEntity.status(403).build();
+		}
 		List<ChatMessage> messages = chatMessageService.findBySessionId(sessionId);
 		return ResponseEntity.ok(messages);
 	}
@@ -102,6 +108,9 @@ public class ChatController {
 	public ResponseEntity<ChatMessage> saveMessage(@PathVariable(value = "sessionId") String sessionId,
 			@RequestBody ChatMessageDTO request) {
 		try {
+			if (!canAccessSession(sessionId)) {
+				return ResponseEntity.status(403).build();
+			}
 			if (request == null) {
 				return ResponseEntity.badRequest().build();
 			}
@@ -137,6 +146,9 @@ public class ChatController {
 	public ResponseEntity<ApiResponse> pinSession(@PathVariable(value = "sessionId") String sessionId,
 			@RequestParam(value = "isPinned") Boolean isPinned) {
 		try {
+			if (!canAccessSession(sessionId)) {
+				return ResponseEntity.status(403).body(ApiResponse.error("无权访问该会话"));
+			}
 			chatSessionService.pinSession(sessionId, isPinned);
 			String message = isPinned ? "会话已置顶" : "会话已取消置顶";
 			return ResponseEntity.ok(ApiResponse.success(message));
@@ -154,6 +166,9 @@ public class ChatController {
 	public ResponseEntity<ApiResponse> renameSession(@PathVariable(value = "sessionId") String sessionId,
 			@RequestParam(value = "title") String title) {
 		try {
+			if (!canAccessSession(sessionId)) {
+				return ResponseEntity.status(403).body(ApiResponse.error("无权访问该会话"));
+			}
 			if (!StringUtils.hasText(title)) {
 				return ResponseEntity.badRequest().body(ApiResponse.error("标题不能为空"));
 			}
@@ -173,6 +188,9 @@ public class ChatController {
 	@DeleteMapping("/sessions/{sessionId}")
 	public ResponseEntity<ApiResponse> deleteSession(@PathVariable(value = "sessionId") String sessionId) {
 		try {
+			if (!canAccessSession(sessionId)) {
+				return ResponseEntity.status(403).body(ApiResponse.error("无权访问该会话"));
+			}
 			chatSessionService.deleteSession(sessionId);
 			return ResponseEntity.ok(ApiResponse.success("会话已删除"));
 		}
@@ -189,6 +207,9 @@ public class ChatController {
 	public ResponseEntity<byte[]> convertAndDownloadHtml(@PathVariable(value = "sessionId") String sessionId,
 			@RequestBody String content) {
 		try {
+			if (!canAccessSession(sessionId)) {
+				return ResponseEntity.status(403).build();
+			}
 			if (!StringUtils.hasText(content)) {
 				return ResponseEntity.badRequest().build();
 			}
@@ -208,6 +229,10 @@ public class ChatController {
 			log.error("Download HTML report error for session {}: {}", sessionId, e.getMessage(), e);
 			return ResponseEntity.internalServerError().build();
 		}
+	}
+
+	private boolean canAccessSession(String sessionId) {
+		return chatSessionService.sessionBelongsToUser(sessionId, UserContextHolder.getCurrentUserId());
 	}
 
 }

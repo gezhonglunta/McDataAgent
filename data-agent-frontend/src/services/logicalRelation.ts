@@ -15,7 +15,7 @@
  */
 
 import axios from 'axios';
-import { ApiResponse } from '@/services/common';
+import { ApiResponse, apiUrl } from '@/services/common';
 
 // 逻辑外键接口定义
 export interface LogicalRelation {
@@ -32,7 +32,7 @@ export interface LogicalRelation {
   updatedTime?: string;
 }
 
-const API_BASE_URL = '/api/datasource';
+const API_BASE_URL = apiUrl('/api/datasource');
 
 class LogicalRelationService {
   // 获取指定数据源的逻辑外键列表

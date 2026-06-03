@@ -15,6 +15,7 @@
  */
 
 import axios from 'axios';
+import { apiUrl } from './common';
 
 interface PresetQuestion {
   id?: number;
@@ -31,7 +32,7 @@ interface PresetQuestionDTO {
   isActive?: boolean;
 }
 
-const API_BASE_URL = '/api/agent';
+const API_BASE_URL = apiUrl('/api/agent');
 
 class PresetQuestionService {
   /**

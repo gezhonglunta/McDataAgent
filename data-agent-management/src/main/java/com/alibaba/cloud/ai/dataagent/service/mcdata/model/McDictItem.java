@@ -21,28 +21,31 @@ package com.alibaba.cloud.ai.dataagent.service.mcdata.model;
  * @author 张华
  */
 public class McDictItem {
-    /**
-     * 数据字典项编码，通常是表记录的存储值
-     */
-    private String dictItemCode;
-    /**
-     * 数据字典项名称，通常是表记录的展示值
-     */
-    private String dictItemName;
 
-    public String getDictItemCode() {
-        return dictItemCode;
-    }
+	/**
+	 * 数据字典项编码，通常是表记录的存储值
+	 */
+	private String dictItemCode;
 
-    public void setDictItemCode(String dictItemCode) {
-        this.dictItemCode = dictItemCode;
-    }
+	/**
+	 * 数据字典项名称，通常是表记录的展示值
+	 */
+	private String dictItemName;
 
-    public String getDictItemName() {
-        return dictItemName;
-    }
+	public String getDictItemCode() {
+		return dictItemCode;
+	}
 
-    public void setDictItemName(String dictItemName) {
-        this.dictItemName = dictItemName;
-    }
+	public void setDictItemCode(String dictItemCode) {
+		this.dictItemCode = dictItemCode;
+	}
+
+	public String getDictItemName() {
+		return dictItemName;
+	}
+
+	public void setDictItemName(String dictItemName) {
+		this.dictItemName = dictItemName;
+	}
+
 }

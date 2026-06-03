@@ -78,4 +78,5 @@ public interface AgentDatasourceMapper {
 
 	@Select("SELECT id FROM agent_datasource WHERE agent_id = #{agentId} AND datasource_id = #{datasourceId}")
 	int getIdByAgentIdAndDatasourceId(@Param("agentId") Long agentId, @Param("datasourceId") Integer datasourceId);
+
 }

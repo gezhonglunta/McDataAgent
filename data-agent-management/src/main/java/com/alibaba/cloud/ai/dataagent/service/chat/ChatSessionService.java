@@ -24,44 +24,30 @@ import java.util.List;
  */
 public interface ChatSessionService {
 
-	/**
-	 * Get session list by agent ID
-	 */
-	List<ChatSession> findByAgentId(Integer agentId);
+	List<ChatSession> findByAgentId(Integer agentId, String userId);
 
-	/**
-	 * Create a new session
-	 */
-	ChatSession createSession(Integer agentId, String title, Long userId);
+	ChatSession createSession(Integer agentId, String title, String userId);
 
-	/**
-	 * Find session by id.
-	 */
 	ChatSession findBySessionId(String sessionId);
 
-	/**
-	 * Clear all sessions for an agent
-	 */
-	void clearSessionsByAgentId(Integer agentId);
+	boolean sessionBelongsToUser(String sessionId, String userId);
 
-	/**
-	 * Update the last activity time of a session
-	 */
+	void clearSessionsByAgentId(Integer agentId, String userId);
+
 	void updateSessionTime(String sessionId);
 
-	/**
-	 * 置顶/取消置顶会话
-	 */
 	void pinSession(String sessionId, boolean isPinned);
 
-	/**
-	 * Rename session
-	 */
 	void renameSession(String sessionId, String newTitle);
 
-	/**
-	 * Delete a single session
-	 */
 	void deleteSession(String sessionId);
+
+	default List<ChatSession> findByAgentId(Integer agentId) {
+		return findByAgentId(agentId, null);
+	}
+
+	default void clearSessionsByAgentId(Integer agentId) {
+		clearSessionsByAgentId(agentId, null);
+	}
 
 }

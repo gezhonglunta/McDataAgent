@@ -20,6 +20,7 @@ import com.alibaba.cloud.ai.dataagent.mapper.ChatSessionMapper;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -36,8 +37,8 @@ public class ChatSessionServiceImpl implements ChatSessionService {
 	 * Get session list by agent ID
 	 */
 	@Override
-	public List<ChatSession> findByAgentId(Integer agentId) {
-		return chatSessionMapper.selectByAgentId(agentId);
+	public List<ChatSession> findByAgentId(Integer agentId, String userId) {
+		return chatSessionMapper.selectByAgentId(agentId, userId);
 	}
 
 	@Override
@@ -45,28 +46,32 @@ public class ChatSessionServiceImpl implements ChatSessionService {
 		return chatSessionMapper.selectBySessionId(sessionId);
 	}
 
-	/**
-	 * Create a new session
-	 */
 	@Override
-	public ChatSession createSession(Integer agentId, String title, Long userId) {
-		String sessionId = UUID.randomUUID().toString();
+	public boolean sessionBelongsToUser(String sessionId, String userId) {
+		ChatSession session = chatSessionMapper.selectBySessionId(sessionId);
+		if (session == null) {
+			return false;
+		}
+		if (!StringUtils.hasText(userId)) {
+			return true;
+		}
+		return userId.equals(session.getUserId());
+	}
 
+	@Override
+	public ChatSession createSession(Integer agentId, String title, String userId) {
+		String sessionId = UUID.randomUUID().toString();
 		ChatSession session = new ChatSession(sessionId, agentId, title != null ? title : "新会话", "active", userId);
 		chatSessionMapper.insert(session);
-
-		log.info("Created new chat session: {} for agent: {}", sessionId, agentId);
+		log.info("Created new chat session: {} for agent: {}, user: {}", sessionId, agentId, userId);
 		return session;
 	}
 
-	/**
-	 * Clear all sessions for an agent
-	 */
 	@Override
-	public void clearSessionsByAgentId(Integer agentId) {
+	public void clearSessionsByAgentId(Integer agentId, String userId) {
 		LocalDateTime now = LocalDateTime.now();
-		int updated = chatSessionMapper.softDeleteByAgentId(agentId, now);
-		log.info("Cleared {} sessions for agent: {}", updated, agentId);
+		int updated = chatSessionMapper.softDeleteByAgentId(agentId, userId, now);
+		log.info("Cleared {} sessions for agent: {}, user: {}", updated, agentId, userId);
 	}
 
 	/**

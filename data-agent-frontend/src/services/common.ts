@@ -14,7 +14,43 @@
  * limitations under the License.
  */
 
-// 定义通用响应结构
+import axios from 'axios';
+
+const API_BASE = import.meta.env.VITE_API_BASE || '';
+
+export const apiUrl = (path: string): string => {
+  const normalizedPath = path.startsWith('/') ? path : `/${path}`;
+  return `${API_BASE}${normalizedPath}`;
+};
+
+const bearerToken = (): string | null => {
+  const match = document.cookie.match(/(?:^|;\s*)Bearer=([^;]+)/);
+  return match ? decodeURIComponent(match[1]) : null;
+};
+
+export const authHeaders = (): Record<string, string> => {
+  const token = bearerToken();
+  return token ? { Authorization: `Bearer ${token}` } : {};
+};
+
+export const apiFetch = (path: string, init: RequestInit = {}): Promise<Response> => {
+  return fetch(apiUrl(path), {
+    ...init,
+    headers: {
+      ...authHeaders(),
+      ...init.headers,
+    },
+  });
+};
+
+axios.interceptors.request.use(config => {
+  const token = bearerToken();
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
+
 export interface ApiResponse<T = unknown> {
   success: boolean;
   message: string;

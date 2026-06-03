@@ -157,7 +157,7 @@ public class SchemaServiceImpl implements SchemaService {
 			log.debug("Fetching tables for datasource: {}", datasourceId);
 			List<TableInfoBO> tables = dbAccessor.fetchTables(config, dqp);
 			log.info("Found  tables for datasource: {}", tables.size(), datasourceId);
-			//补全mc表信息
+			// 补全mc表信息
 			ApplicationContextHelper.getBean(McDatasourceService.class).filterMcInfo(config, dbAccessor, tables);
 
 			if (tables.size() > 5) {

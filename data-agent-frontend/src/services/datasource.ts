@@ -15,7 +15,7 @@
  */
 
 import axios from 'axios';
-import { ApiResponse } from '@/services/common';
+import { ApiResponse, apiUrl } from '@/services/common';
 
 export interface Datasource {
   id?: number;
@@ -56,7 +56,7 @@ export interface DatasourceType {
   displayName: string;
 }
 
-const API_BASE_URL = '/api/datasource';
+const API_BASE_URL = apiUrl('/api/datasource');
 
 class DatasourceService {
   // 1. 获取所有数据源列表

@@ -15,7 +15,7 @@
  */
 
 import axios from 'axios';
-import { ApiResponse } from './common';
+import { ApiResponse, apiUrl } from './common';
 
 interface SemanticModel {
   id?: number;
@@ -66,7 +66,7 @@ interface BatchImportResult {
   errors: string[];
 }
 
-const API_BASE_URL = '/api/semantic-model';
+const API_BASE_URL = apiUrl('/api/semantic-model');
 
 class SemanticModelService {
   /**

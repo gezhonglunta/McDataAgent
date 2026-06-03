@@ -15,6 +15,7 @@
  */
 
 import axios from 'axios';
+import { apiUrl } from './common';
 import type { ApiResponse } from './common';
 
 export interface ModelConfig {
@@ -42,7 +43,7 @@ export interface ModelCheckReady {
   ready: boolean;
 }
 
-const API_BASE_URL = '/api/model-config';
+const API_BASE_URL = apiUrl('/api/model-config');
 
 class ModelConfigService {
   /**

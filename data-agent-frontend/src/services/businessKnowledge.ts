@@ -15,7 +15,7 @@
  */
 
 import axios from 'axios';
-import { ApiResponse } from './common';
+import { ApiResponse, apiUrl } from './common';
 
 interface BusinessKnowledgeVO {
   id?: number;
@@ -45,7 +45,7 @@ interface UpdateBusinessKnowledgeDTO {
   agentId: number;
 }
 
-const API_BASE_URL = '/api/business-knowledge';
+const API_BASE_URL = apiUrl('/api/business-knowledge');
 
 class BusinessKnowledgeService {
   /**

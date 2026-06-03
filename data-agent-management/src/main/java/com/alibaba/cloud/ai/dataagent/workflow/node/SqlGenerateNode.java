@@ -139,7 +139,7 @@ public class SqlGenerateNode implements NodeAction {
 		String agentId = StateUtil.getStringValue(state, AGENT_ID);
 
 		// 查询 Agent 的激活数据源
-		AgentDatasourceMapper agentDatasourceMapper= ApplicationContextHelper.getBean(AgentDatasourceMapper.class);
+		AgentDatasourceMapper agentDatasourceMapper = ApplicationContextHelper.getBean(AgentDatasourceMapper.class);
 		Integer datasourceId = agentDatasourceMapper.selectActiveDatasourceIdByAgentId(Long.valueOf(agentId));
 		if (datasourceId == null) {
 			log.warn("Agent {} has no active datasource, using default value", agentId);

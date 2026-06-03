@@ -60,7 +60,8 @@ public class VectorStoreTestController {
 
 			List<Document> documents = vectorStore.similaritySearch(builder.build());
 			return ApiResponse.success("success search vector store", documents);
-		} catch (Exception e) {
+		}
+		catch (Exception e) {
 			log.error("Failed to test vector store search", e);
 			return ApiResponse.error("Failed to search vector store: " + e.getMessage());
 		}

@@ -15,6 +15,7 @@
  */
 
 import axios from 'axios';
+import { apiUrl } from './common';
 
 /**
  * 知识库实体
@@ -58,7 +59,7 @@ export interface PageResult<T> {
   message?: string;
 }
 
-const API_BASE_URL = '/api/agent-knowledge';
+const API_BASE_URL = apiUrl('/api/agent-knowledge');
 
 class AgentKnowledgeService {
   /**

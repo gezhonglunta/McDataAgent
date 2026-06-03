@@ -32,8 +32,7 @@ export const fileUploadApi = {
     const formData = new FormData();
     formData.append('file', file);
 
-    const url = '/api/upload/avatar';
-    return fetch(url, {
+    return apiFetch('/api/upload/avatar', {
       method: 'POST',
       body: formData,
     }).then(async response => {
@@ -50,3 +49,4 @@ export const fileUploadApi = {
     });
   },
 };
+import { apiFetch } from './common';

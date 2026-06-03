@@ -16,7 +16,7 @@
 <template>
   <div class="base-layout">
     <!-- 现代化头部导航 -->
-    <header class="page-header">
+    <header v-if="!hideHeader" class="page-header">
       <div class="header-content">
         <div class="brand-section">
           <div class="brand-logo">
@@ -38,7 +38,7 @@
     </header>
 
     <!-- 页面内容区域 -->
-    <main class="page-content">
+    <main class="page-content" :class="{ 'full-height': hideHeader }">
       <slot></slot>
     </main>
   </div>
@@ -46,11 +46,14 @@
 
 <script>
   import { useRouter } from 'vue-router';
+  import { computed } from 'vue';
 
   export default {
     name: 'BaseLayout',
     setup() {
       const router = useRouter();
+
+      const hideHeader = computed(() => router.currentRoute.value.meta?.hideHeader === true);
 
       // 导航方法
       const goToAgentList = () => {
@@ -66,7 +69,8 @@
           router.currentRoute.value.name === 'AgentList' ||
           router.currentRoute.value.name === 'AgentDetail' ||
           router.currentRoute.value.name === 'AgentCreate' ||
-          router.currentRoute.value.name === 'AgentRun'
+          router.currentRoute.value.name === 'AgentRun' ||
+          router.currentRoute.value.name === 'UserAgentRun'
         );
       };
 
@@ -75,6 +79,7 @@
       };
 
       return {
+        hideHeader,
         goToAgentList,
         goToModelConfig,
         isAgentPage,

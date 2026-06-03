@@ -127,6 +127,7 @@
   import { useRouter, useRoute } from 'vue-router';
   import { ElMessage, ElMessageBox } from 'element-plus';
   import ChatService from '../../services/chat';
+  import { apiUrl } from '../../services/common';
   import {
     Plus,
     Delete,
@@ -231,7 +232,7 @@
         if (sessionEventSource.value) {
           sessionEventSource.value.close();
         }
-        const source = new EventSource(`/api/agent/${currentAgentId}/sessions/stream`);
+        const source = new EventSource(apiUrl(`/api/agent/${currentAgentId}/sessions/stream`));
         source.addEventListener('title-updated', event => {
           try {
             const data = JSON.parse((event as MessageEvent<string>).data) as SessionUpdateEvent;

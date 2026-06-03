@@ -33,6 +33,7 @@ target/
 .flattened-pom.xml
 
 # node_modules
+**/node
 **/node_modules
 
 

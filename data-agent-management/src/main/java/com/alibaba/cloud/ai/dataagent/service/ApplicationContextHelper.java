@@ -21,6 +21,7 @@ import org.springframework.stereotype.Component;
 
 @Component
 public class ApplicationContextHelper implements ApplicationContextAware {
+
 	private static ApplicationContext context;
 
 	@Override
@@ -31,4 +32,5 @@ public class ApplicationContextHelper implements ApplicationContextAware {
 	public static <T> T getBean(Class<T> beanClass) {
 		return context == null ? null : context.getBean(beanClass);
 	}
+
 }

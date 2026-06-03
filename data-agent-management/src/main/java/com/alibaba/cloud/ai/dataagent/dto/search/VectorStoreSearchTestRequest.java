@@ -36,7 +36,8 @@ public class VectorStoreSearchTestRequest {
 	private Double similarityThreshold;
 
 	/**
-	 * Spring AI filter expression text, for example: datasourceId == '4' && vectorType == 'TABLE'.
+	 * Spring AI filter expression text, for example: datasourceId == '4' && vectorType ==
+	 * 'TABLE'.
 	 */
 	private String filterExpression;
 

@@ -15,6 +15,7 @@
  */
 package com.alibaba.cloud.ai.dataagent.controller;
 
+import com.alibaba.cloud.ai.dataagent.util.UserContextHolder;
 import com.alibaba.cloud.ai.dataagent.service.chat.SessionEventPublisher;
 import com.alibaba.cloud.ai.dataagent.vo.SessionUpdateEvent;
 import lombok.RequiredArgsConstructor;
@@ -41,8 +42,9 @@ public class SessionEventController {
 		response.getHeaders().add("Connection", "keep-alive");
 		response.getHeaders().add("Access-Control-Allow-Origin", "*");
 
-		log.debug("Client subscribed to session update stream for agent {}", agentId);
-		return sessionEventPublisher.register(agentId)
+		String userId = UserContextHolder.getCurrentUserId();
+		log.debug("Client subscribed to session update stream for agent {}, user {}", agentId, userId);
+		return sessionEventPublisher.register(agentId, userId)
 			.doFinally(
 					signal -> log.debug("Session update stream finished for agent {} with signal {}", agentId, signal));
 	}

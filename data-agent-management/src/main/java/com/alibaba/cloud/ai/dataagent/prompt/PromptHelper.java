@@ -131,7 +131,8 @@ public class PromptHelper {
 		params.put("execution_description", semanticConsistencyDTO.getExecutionDescription());
 		params.put("user_query", semanticConsistencyDTO.getUserQuery());
 		params.put("evidence", semanticConsistencyDTO.getEvidence());
-		params.put("schema_info", ApplicationContextHelper.getBean(McDatasourceService.class).extBuildSemanticConsistenPrompt(semanticConsistencyDTO.getSchemaInfo()));
+		params.put("schema_info", ApplicationContextHelper.getBean(McDatasourceService.class)
+			.extBuildSemanticConsistenPrompt(semanticConsistencyDTO.getSchemaInfo()));
 		params.put("sql", semanticConsistencyDTO.getSql());
 		return PromptConstant.getSemanticConsistencyPromptTemplate().render(params);
 	}
@@ -199,7 +200,7 @@ public class PromptHelper {
 		String semanticModel = CollectionUtils.isEmpty(semanticModels) ? ""
 				: semanticModels.stream().map(SemanticModel::getPromptInfo).collect(Collectors.joining(";\n"));
 		params.put("semanticModel", semanticModel);
-		ApplicationContextHelper.getBean(McDatasourceService.class).extBuildSemanticModelPrompt(semanticModels,params);
+		ApplicationContextHelper.getBean(McDatasourceService.class).extBuildSemanticModelPrompt(semanticModels, params);
 		return PromptConstant.getSemanticModelPromptTemplate().render(params);
 	}
 

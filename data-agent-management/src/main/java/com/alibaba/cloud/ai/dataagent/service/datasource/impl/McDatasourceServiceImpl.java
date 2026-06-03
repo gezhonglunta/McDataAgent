@@ -60,6 +60,7 @@ public class McDatasourceServiceImpl implements McDatasourceService {
 	private final DatasourceService datasourceService;
 
 	private final AccessorFactory accessorFactory;
+
 	private static final Map<String, Map<String, String>> COLUMN_INFO_MAP = new HashMap<>(8);
 
 	static {
@@ -99,12 +100,14 @@ public class McDatasourceServiceImpl implements McDatasourceService {
 		List<String> tableNames;
 		try {
 			int agentDatasourceId = agentDatasourceMapper.getIdByAgentIdAndDatasourceId(agentId, datasourceId);
-			tableNames = tablesMapper.getAgentDatasourceTables(agentDatasourceId).stream()
-					.filter(Objects::nonNull)
-					.map(table -> table.trim().toUpperCase(Locale.ROOT))
-					.filter(table -> !table.isEmpty())
-					.toList();
-		} catch (Exception e) {
+			tableNames = tablesMapper.getAgentDatasourceTables(agentDatasourceId)
+				.stream()
+				.filter(Objects::nonNull)
+				.map(table -> table.trim().toUpperCase(Locale.ROOT))
+				.filter(table -> !table.isEmpty())
+				.toList();
+		}
+		catch (Exception e) {
 			log.error("找不到智能体的数据源配置：agentId={},datasourceId={}", agentId, datasourceId, e);
 			return;
 		}
@@ -144,9 +147,10 @@ public class McDatasourceServiceImpl implements McDatasourceService {
 		ResultSetBO resultSetBO;
 		try {
 			resultSetBO = accessor.executeSqlAndReturnObject(dbConfig, queryParameter);
-		} catch (Exception e) {
-			throw new RuntimeException("Failed to query MC metadata for datasource " + datasourceId + ": "
-					+ e.getMessage(), e);
+		}
+		catch (Exception e) {
+			throw new RuntimeException(
+					"Failed to query MC metadata for datasource " + datasourceId + ": " + e.getMessage(), e);
 		}
 
 		List<Map<String, String>> rows = resultSetBO != null && resultSetBO.getData() != null ? resultSetBO.getData()
@@ -158,18 +162,18 @@ public class McDatasourceServiceImpl implements McDatasourceService {
 		}
 
 		List<LogicalRelation> logicalRelations = rows.stream()
-				.map(row -> LogicalRelation.builder()
-						.datasourceId(datasourceId)
-						.sourceTableName(lower(row.get("src_table_name")))
-						.sourceColumnName(lower(row.get("src_table_col_no")))
-						.targetTableName(lower(row.get("dst_table_name")))
-						.targetColumnName(lower(row.get("dst_table_col_no")))
-						.relationType("1:1")
-						.description(String.format("%s通过%s关联%s%s", ensureTableSuffix(row.get("src_orm_name")),
-								lower(row.get("src_table_col_no")), ensureTableSuffix(row.get("dst_orm_name")),
-								lower(row.get("dst_table_col_no"))))
-						.build())
-				.toList();
+			.map(row -> LogicalRelation.builder()
+				.datasourceId(datasourceId)
+				.sourceTableName(lower(row.get("src_table_name")))
+				.sourceColumnName(lower(row.get("src_table_col_no")))
+				.targetTableName(lower(row.get("dst_table_name")))
+				.targetColumnName(lower(row.get("dst_table_col_no")))
+				.relationType("1:1")
+				.description(String.format("%s通过%s关联%s%s", ensureTableSuffix(row.get("src_orm_name")),
+						lower(row.get("src_table_col_no")), ensureTableSuffix(row.get("dst_orm_name")),
+						lower(row.get("dst_table_col_no"))))
+				.build())
+			.toList();
 		log.info("开始删除全部的关联关系，AgentId={},DataSourceId={}", agentId, datasourceId);
 		logicalRelationMapper.deleteAll(datasourceId);
 		datasourceService.saveLogicalRelations(datasourceId, logicalRelations);
@@ -184,7 +188,8 @@ public class McDatasourceServiceImpl implements McDatasourceService {
 				table.setSchema(config.getSchema());
 			}
 			String mcDesc;
-			if (StringUtils.isBlank(table.getDescription()) && (mcDesc = mcTableList.get(table.getName().toUpperCase())) != null) {
+			if (StringUtils.isBlank(table.getDescription())
+					&& (mcDesc = mcTableList.get(table.getName().toUpperCase())) != null) {
 				table.setDescription(mcDesc);
 			}
 		}
@@ -200,10 +205,11 @@ public class McDatasourceServiceImpl implements McDatasourceService {
 			queryParameter.setSql(sql);
 			queryParameter.setSchema(dbConfig.getSchema());
 			ResultSetBO resultSetBO = accessor.executeSqlAndReturnObject(dbConfig, queryParameter);
-			List<Map<String, String>> rows = resultSetBO != null && resultSetBO.getData() != null ? resultSetBO.getData()
-					: Collections.emptyList();
+			List<Map<String, String>> rows = resultSetBO != null && resultSetBO.getData() != null
+					? resultSetBO.getData() : Collections.emptyList();
 			return formatDictNamesAsMarkdownTable(rows);
-		} catch (Exception e) {
+		}
+		catch (Exception e) {
 			log.error("查找MC业务表说明失败：datasourceId={}", datasourceId, e);
 		}
 		return "";
@@ -217,15 +223,19 @@ public class McDatasourceServiceImpl implements McDatasourceService {
 			queryParameter.setSql(sql);
 			queryParameter.setSchema(dbConfig.getSchema());
 			ResultSetBO resultSetBO = dbAccessor.executeSqlAndReturnObject(dbConfig, queryParameter);
-			List<Map<String, String>> rows = resultSetBO != null && resultSetBO.getData() != null ? resultSetBO.getData()
-					: Collections.emptyList();
-			Set<String> mcTableNames = rows.stream().map(e -> e.get("table_name")).map(e -> e.toLowerCase()).collect(Collectors.toSet());
+			List<Map<String, String>> rows = resultSetBO != null && resultSetBO.getData() != null
+					? resultSetBO.getData() : Collections.emptyList();
+			Set<String> mcTableNames = rows.stream()
+				.map(e -> e.get("table_name"))
+				.map(e -> e.toLowerCase())
+				.collect(Collectors.toSet());
 			mcTableNames.add("sy_dept");
 			mcTableNames.add("sy_user");
 			mcTableNames.add("sy_role");
 			mcTableNames.add("sy_user_role");
 			return mcTableNames;
-		} catch (Exception e) {
+		}
+		catch (Exception e) {
 			log.error("查找MC业务表说明失败：username={}", dbConfig.getUsername(), e);
 			return new HashSet<>(0);
 		}
@@ -267,7 +277,8 @@ public class McDatasourceServiceImpl implements McDatasourceService {
 		Integer datasourceId = CollectionUtils.isEmpty(semanticModels) ? null : semanticModels.get(0).getDatasourceId();
 		if (datasourceId != null) {
 			params.put("dict_list", listDictNamesForLLM(datasourceId));
-		} else {
+		}
+		else {
 			params.put("dict_list", "");
 		}
 	}
@@ -304,20 +315,25 @@ public class McDatasourceServiceImpl implements McDatasourceService {
 
 	private Map<String, String> tableDescList(DbConfigBO config, Accessor dbAccessor, List<TableInfoBO> tables) {
 		try {
-			Set<String> tableNames = tables.stream().map(e -> e.getName()).map(String::toUpperCase).collect(Collectors.toSet());
+			Set<String> tableNames = tables.stream()
+				.map(e -> e.getName())
+				.map(String::toUpperCase)
+				.collect(Collectors.toSet());
 			StringJoiner tableInClause = new StringJoiner(", ");
 			for (String tableName : tableNames) {
 				tableInClause.add("'" + tableName + "'");
 			}
-			String sql = "select table_name,orm_name from ms_orm_model where table_name in (%s)".formatted(tableInClause.toString());
+			String sql = "select table_name,orm_name from ms_orm_model where table_name in (%s)"
+				.formatted(tableInClause.toString());
 			DbQueryParameter queryParameter = DbQueryParameter.from(config);
 			queryParameter.setSql(sql);
 			queryParameter.setSchema(config.getSchema());
 			ResultSetBO resultSetBO = dbAccessor.executeSqlAndReturnObject(config, queryParameter);
-			List<Map<String, String>> rows = resultSetBO != null && resultSetBO.getData() != null ? resultSetBO.getData()
-					: Collections.emptyList();
+			List<Map<String, String>> rows = resultSetBO != null && resultSetBO.getData() != null
+					? resultSetBO.getData() : Collections.emptyList();
 			return rows.stream().collect(Collectors.toMap(e -> e.get("table_name"), e -> e.get("orm_name")));
-		} catch (Exception e) {
+		}
+		catch (Exception e) {
 			log.error("查找MC业务表说明失败：DbConfig={}", config, e);
 			return new HashMap<>(0);
 		}
@@ -336,4 +352,5 @@ public class McDatasourceServiceImpl implements McDatasourceService {
 		}
 		return text.toLowerCase(Locale.ROOT);
 	}
+
 }

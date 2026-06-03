@@ -85,7 +85,7 @@ public class SessionTitleService {
 			}
 
 			chatSessionService.renameSession(sessionId, title);
-			sessionEventPublisher.publishTitleUpdated(session.getAgentId(), sessionId, title);
+			sessionEventPublisher.publishTitleUpdated(session.getAgentId(), session.getUserId(), sessionId, title);
 			log.info("Generated session title '{}' for session {}", title, sessionId);
 		}
 		catch (Exception ex) {

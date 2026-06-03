@@ -80,7 +80,11 @@ public class DynamicModelFactory {
 			.streamUsage(true)
 			.build();
 		// 4. 返回统一的 OpenAiChatModel
-		return OpenAiChatModel.builder().openAiApi(openAiApi).defaultOptions(openAiChatOptions).retryTemplate(RetryTemplate.builder().maxAttempts(1).build()).build();
+		return OpenAiChatModel.builder()
+			.openAiApi(openAiApi)
+			.defaultOptions(openAiChatOptions)
+			.retryTemplate(RetryTemplate.builder().maxAttempts(1).build())
+			.build();
 	}
 
 	/**

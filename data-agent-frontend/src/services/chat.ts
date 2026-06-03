@@ -15,6 +15,7 @@
  */
 
 import axios from 'axios';
+import { apiUrl } from './common';
 import type { ApiResponse } from './common';
 
 export interface ChatSession {
@@ -47,7 +48,7 @@ class ChatService {
    * @param agentId Agent ID
    */
   async getAgentSessions(agentId: number): Promise<ChatSession[]> {
-    const response = await axios.get<ChatSession[]>(`${API_BASE_URL}/agent/${agentId}/sessions`);
+    const response = await axios.get<ChatSession[]>(apiUrl(`${API_BASE_URL}/agent/${agentId}/sessions`));
     return response.data;
   }
 
@@ -64,7 +65,7 @@ class ChatService {
     };
 
     const response = await axios.post<ChatSession>(
-      `${API_BASE_URL}/agent/${agentId}/sessions`,
+      apiUrl(`${API_BASE_URL}/agent/${agentId}/sessions`),
       request,
     );
     return response.data;
@@ -75,7 +76,7 @@ class ChatService {
    * @param agentId Agent ID
    */
   async clearAgentSessions(agentId: number): Promise<ApiResponse> {
-    const response = await axios.delete<ApiResponse>(`${API_BASE_URL}/agent/${agentId}/sessions`);
+    const response = await axios.delete<ApiResponse>(apiUrl(`${API_BASE_URL}/agent/${agentId}/sessions`));
     return response.data;
   }
 
@@ -85,7 +86,7 @@ class ChatService {
    */
   async getSessionMessages(sessionId: string): Promise<ChatMessage[]> {
     const response = await axios.get<ChatMessage[]>(
-      `${API_BASE_URL}/sessions/${sessionId}/messages`,
+      apiUrl(`${API_BASE_URL}/sessions/${sessionId}/messages`),
     );
     return response.data;
   }
@@ -104,7 +105,7 @@ class ChatService {
       };
 
       const response = await axios.post<ChatMessage>(
-        `${API_BASE_URL}/sessions/${sessionId}/messages`,
+        apiUrl(`${API_BASE_URL}/sessions/${sessionId}/messages`),
         messageData,
       );
       return response.data;
@@ -124,7 +125,7 @@ class ChatService {
   async pinSession(sessionId: string, isPinned: boolean): Promise<ApiResponse> {
     try {
       const response = await axios.put<ApiResponse>(
-        `${API_BASE_URL}/sessions/${sessionId}/pin`,
+        apiUrl(`${API_BASE_URL}/sessions/${sessionId}/pin`),
         null,
         {
           params: { isPinned },
@@ -154,7 +155,7 @@ class ChatService {
       }
 
       const response = await axios.put<ApiResponse>(
-        `${API_BASE_URL}/sessions/${sessionId}/rename`,
+        apiUrl(`${API_BASE_URL}/sessions/${sessionId}/rename`),
         null,
         {
           params: { title: title.trim() },
@@ -178,7 +179,7 @@ class ChatService {
    */
   async deleteSession(sessionId: string): Promise<ApiResponse> {
     try {
-      const response = await axios.delete<ApiResponse>(`${API_BASE_URL}/sessions/${sessionId}`);
+      const response = await axios.delete<ApiResponse>(apiUrl(`${API_BASE_URL}/sessions/${sessionId}`));
       return response.data;
     } catch (error) {
       if (axios.isAxiosError(error) && error.response?.status === 500) {
@@ -196,7 +197,7 @@ class ChatService {
   async downloadHtmlReport(sessionId: string, content: string): Promise<void> {
     try {
       const response = await axios.post(
-        `${API_BASE_URL}/sessions/${sessionId}/reports/html`,
+        apiUrl(`${API_BASE_URL}/sessions/${sessionId}/reports/html`),
         content,
         {
           responseType: 'blob', // 重要：设置响应类型为blob

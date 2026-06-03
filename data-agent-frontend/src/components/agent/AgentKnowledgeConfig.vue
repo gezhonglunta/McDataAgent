@@ -410,6 +410,7 @@
     Warning,
   } from '@element-plus/icons-vue';
   import axios from 'axios';
+  import { apiUrl } from '@/services/common';
   import agentKnowledgeService, {
     AgentKnowledge,
     AgentKnowledgeQueryDTO,
@@ -702,7 +703,7 @@
               }
             }
 
-            const response = await axios.post('/api/agent-knowledge/create', formData, {
+            const response = await axios.post(apiUrl('/api/agent-knowledge/create'), formData, {
               headers: {
                 'Content-Type': 'multipart/form-data',
               },

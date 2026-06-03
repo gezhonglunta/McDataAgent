@@ -3,5 +3,6 @@
     "watcher":
     {
         "ignore": ["node_modules/**", "dist/**", ".git/**", "logs/**", "**/logs/**", "target/**", "**/target/**", "**/work/**", ".mc", ".idea", ".wiscode", ".opencode", "src/main/resources/static/**", "src/main/resources/templates/**", "lib/**", "extlib/**", "extlib-boot/**", "*.zip", "*.tar", "data-agent-frontend/**", "CI/**", "**/vectorstore/**", "docker-file/**", ".idea/**", ".github/**", ".mvn/**"]
-    }
+    },
+    "plugin": ["superpowers@git+https://github.com/obra/superpowers.git"]
 }

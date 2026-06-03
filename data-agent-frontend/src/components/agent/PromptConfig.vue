@@ -259,6 +259,8 @@
 </template>
 
 <script>
+  import { apiFetch } from '@/services/common';
+
   export default {
     name: 'AgentPromptConfig',
     props: {
@@ -327,7 +329,7 @@
         try {
           this.loading = true;
           const query = this.agentId ? `?agentId=${this.agentId}` : '';
-          const response = await fetch(
+          const response = await apiFetch(
             `/api/prompt-config/list-by-type/${this.promptType}${query}`,
           );
           const result = await response.json();
@@ -363,7 +365,7 @@
             configData.id = this.editingConfig.id;
           }
 
-          const response = await fetch('/api/prompt-config/save', {
+          const response = await apiFetch('/api/prompt-config/save', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -391,7 +393,7 @@
             ? `/api/prompt-config/${config.id}/disable`
             : `/api/prompt-config/${config.id}/enable`;
 
-          const response = await fetch(url, { method: 'POST' });
+          const response = await apiFetch(url, { method: 'POST' });
           const result = await response.json();
 
           if (result.success) {
@@ -412,7 +414,7 @@
         }
 
         try {
-          const response = await fetch(`/api/prompt-config/${configId}`, {
+          const response = await apiFetch(`/api/prompt-config/${configId}`, {
             method: 'DELETE',
           });
           const result = await response.json();
@@ -459,7 +461,7 @@
         if (this.selectedConfigs.length === 0) return;
 
         try {
-          const response = await fetch('/api/prompt-config/batch-enable', {
+          const response = await apiFetch('/api/prompt-config/batch-enable', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -485,7 +487,7 @@
         if (this.selectedConfigs.length === 0) return;
 
         try {
-          const response = await fetch('/api/prompt-config/batch-disable', {
+          const response = await apiFetch('/api/prompt-config/batch-disable', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -535,7 +537,7 @@
 
       async updatePriority() {
         try {
-          const response = await fetch(
+          const response = await apiFetch(
             `/api/prompt-config/${this.editingPriorityConfig.id}/priority`,
             {
               method: 'POST',

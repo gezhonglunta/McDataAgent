@@ -242,7 +242,8 @@ public class DatasourceServiceImpl implements DatasourceService {
 		Accessor dbAccessor = accessorFactory.getAccessorByDbConfig(dbConfig);
 		List<TableInfoBO> tableInfoList = dbAccessor.showTables(dbConfig, queryParam);
 
-		Set<String> mcTableNames = ApplicationContextHelper.getBean(McDatasourceService.class).mcBussTableNames(dbConfig, dbAccessor);
+		Set<String> mcTableNames = ApplicationContextHelper.getBean(McDatasourceService.class)
+			.mcBussTableNames(dbConfig, dbAccessor);
 
 		// Extract table names
 		List<String> tableNames = tableInfoList.stream()
