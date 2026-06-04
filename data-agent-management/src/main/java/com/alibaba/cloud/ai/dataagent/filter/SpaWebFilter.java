@@ -21,6 +21,7 @@ import org.springframework.core.annotation.Order;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
 import org.springframework.web.server.ServerWebExchange;
 import org.springframework.web.server.WebFilter;
 import org.springframework.web.server.WebFilterChain;
@@ -36,14 +37,8 @@ public class SpaWebFilter implements WebFilter {
 	@Override
 	public Mono<Void> filter(ServerWebExchange exchange, WebFilterChain chain) {
 		String path = exchange.getRequest().getURI().getPath();
-		String frontPrefix = basePath + "/front";
 
-		if (!path.startsWith(frontPrefix)) {
-			return chain.filter(exchange);
-		}
-
-		String subPath = path.substring(frontPrefix.length());
-		if (subPath.startsWith("/api") || subPath.contains(".")) {
+		if (!shouldFallbackToIndex(path, basePath)) {
 			return chain.filter(exchange);
 		}
 
@@ -53,6 +48,38 @@ public class SpaWebFilter implements WebFilter {
 			exchange.getResponse().getHeaders().setContentLength(bytes.length);
 			return exchange.getResponse().writeWith(Mono.just(exchange.getResponse().bufferFactory().wrap(bytes)));
 		});
+	}
+
+	static boolean shouldFallbackToIndex(String path, String basePath) {
+		String normalizedPath = stripBasePath(path, basePath);
+		if (!StringUtils.hasText(normalizedPath) || "/".equals(normalizedPath)) {
+			return true;
+		}
+		if (normalizedPath.contains(".")) {
+			return false;
+		}
+		if (normalizedPath.startsWith("/api") || normalizedPath.startsWith("/uploads")
+				|| normalizedPath.startsWith("/actuator") || normalizedPath.startsWith("/v3/api-docs")
+				|| normalizedPath.startsWith("/swagger-ui") || normalizedPath.startsWith("/h2-console")
+				|| normalizedPath.startsWith("/mcp")) {
+			return false;
+		}
+		if (normalizedPath.startsWith("/front/assets") || normalizedPath.startsWith("/assets")) {
+			return false;
+		}
+		return true;
+	}
+
+	private static String stripBasePath(String path, String basePath) {
+		if (!StringUtils.hasText(basePath) || "/".equals(basePath)) {
+			return path;
+		}
+		String normalizedBasePath = basePath.endsWith("/") ? basePath.substring(0, basePath.length() - 1) : basePath;
+		if (path.startsWith(normalizedBasePath)) {
+			String stripped = path.substring(normalizedBasePath.length());
+			return StringUtils.hasText(stripped) ? stripped : "/";
+		}
+		return path;
 	}
 
 }

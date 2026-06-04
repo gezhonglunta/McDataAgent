@@ -23,8 +23,8 @@
 ### 整体流程
 
 ```
-请求 → Spring Cloud Gateway (JWT验签)
-     → /nl2sql/ 前缀转发到本系统
+请求 → Spring Cloud Gateway (JWT验签/转发)
+     → /nl2sql/ 前缀转发到本系统（可保留前缀，也可剥离前缀）
      → JwtAuthenticationWebFilter (解析JWT, 提取userId)
      → Reactor Context 存储 JwtUser
      → Controller 通过 UserContextHolder 获取用户信息
@@ -45,16 +45,23 @@
 ### JwtAuthenticationWebFilter 逻辑
 
 ```
-请求进入 → 检查 Authorization header
-  → 有 Bearer token → Base64 decode payload（不验签，网关已验签）
-    → 提取 sub 字段作为 userId → 构建 JwtUser
-  → 无 token → userId = null（兼容无用户模式）
+请求进入 → 按 header → cookie → request parameter 顺序提取 token
+  → 若是前端入口、静态资源或前端 History 路由（如 /front/model-config）→ 直接放行
+  → 有 token → 按配置进行 HS256 + base64Secret 验签（默认开启）
+    → 解析 payload claims → 提取 jwt-claim-name 字段作为 userId → 构建 JwtUser
+  → 无 token / 验签失败 / claim 缺失 → 返回 401
   → 将 JwtUser 同时写入 Reactor Context 和 ThreadLocal
   → 继续 filter chain
   → 请求结束时清理 ThreadLocal（防止线程池复用导致数据泄漏）
 ```
 
 **ThreadLocal 生命周期**：Filter 在请求开始时设置 ThreadLocal，在 `doFinally` 中清理，确保线程池场景下不会泄漏。
+
+**前端路由放行规则**：`JwtAuthenticationWebFilter` 只应拦截真正需要用户身份的后端接口，不能拦截前端页面路由。对于 `/front/**` 下不带扩展名、且不是静态资源的路径，应视为前端 SPA History 路由并直接放行，例如：`/front/model-config`、`/front/agent/1/run`、`/front/user-agent/1/run`。这些请求后续由 `SpaWebFilter` 返回 `index.html`，再由前端路由接管。
+
+**问题场景说明**：在线上网关保留 `/nl2sql` 前缀的部署中，浏览器访问 `http://<gateway>/nl2sql/front/model-config` 时，后端实际收到的路径是 `/nl2sql/front/model-config`。如果 `JwtAuthenticationWebFilter` 仅放行首页和静态资源，而不放行 `/front/**` 的 History 路由，请求会在到达 `SpaWebFilter` 之前被错误地返回 401，导致前端页面无法直接访问。
+
+**解决方案**：将 `/front/**` 下的非静态、无扩展名前端路由加入 `JwtAuthenticationWebFilter` 的跳过鉴权规则，同时继续保持 `/api/**` 需要 JWT 鉴权、`/front/assets/**` 和 `/assets/**` 作为静态资源直接放行。这样可以保证“前端路由不鉴权，前端调用 API 时再鉴权”的边界清晰且稳定。
 
 ### 配置项
 
@@ -63,10 +70,67 @@ spring.ai.alibaba.data-agent:
   auth:
     enabled: false          # 是否启用认证，默认关闭
     jwt-claim-name: sub     # JWT 中用户ID的 claim 名称
+    jwt-secret: ""          # JWT HS256 签名密钥，base64 编码字符串
+    signature-algorithm: HS256
+    token-header-name: Authorization
+    token-prefix: "Bearer "
+    token-cookie-name: Bearer
+    token-parameter-name: ""
+    verify-signature: true
   base-path: ""             # URL 前缀，空字符串表示无前缀
 ```
 
-`base-path` 在应用启动时映射到 `spring.webflux.base-path`，由 Spring WebFlux 自动处理所有请求路径前缀。
+`base-path` 在应用启动时映射到 `spring.webflux.base-path`，由 Spring WebFlux 自动处理所有请求路径前缀。该配置表示**本系统实际收到的后端路径前缀**，不是浏览器侧网关路径前缀。
+
+### 网关前缀转发模式
+
+系统支持两种网关转发模式：
+
+#### 模式一：网关保留 `/nl2sql` 前缀
+
+```text
+浏览器访问: /nl2sql/front/index.html
+后端收到:   /nl2sql/front/index.html
+
+浏览器访问: /nl2sql/front/assets/index.js
+后端收到:   /nl2sql/front/assets/index.js
+
+浏览器访问: /nl2sql/api/agent/list
+后端收到:   /nl2sql/api/agent/list
+```
+
+此时配置：
+
+```bash
+DATA_AGENT_BASE_PATH=/nl2sql
+VITE_FRONT_BASE=/nl2sql/front/
+VITE_API_BASE=/nl2sql
+```
+
+约束：当后端静态资源通过 `/front/**` 暴露时，前端构建产物中的 `base` 必须包含完整浏览器访问前缀 `/nl2sql/front/`。不能仅配置为 `/nl2sql/`，否则 `index.html` 中生成的静态资源地址会变成 `/nl2sql/assets/**` 或 `/front/assets/**`，与实际资源映射不一致，经过网关访问首页时会出现 404。
+
+#### 模式二：网关剥离 `/nl2sql` 前缀（推荐用于当前部署）
+
+```text
+浏览器访问: /nl2sql/agents
+后端收到:   /agents
+
+浏览器访问: /nl2sql/api/agent/list
+后端收到:   /api/agent/list
+
+浏览器访问: /nl2sql/assets/index.js
+后端收到:   /assets/index.js
+```
+
+此时配置：
+
+```bash
+DATA_AGENT_BASE_PATH=
+VITE_FRONT_BASE=/
+VITE_API_BASE=
+```
+
+注意：如果网关已经剥离 `/nl2sql`，不要再配置 `DATA_AGENT_BASE_PATH=/nl2sql`，否则 Spring WebFlux 会期待后端收到的路径也带 `/nl2sql`，导致 `/api/**` 和前端路由无法匹配。
 
 ### 数据库变更
 
@@ -170,9 +234,11 @@ VITE_FRONT_BASE=/
 VITE_API_BASE=
 
 # .env.production
-VITE_FRONT_BASE=/front/
+VITE_FRONT_BASE=/nl2sql/front/
 VITE_API_BASE=/nl2sql
 ```
+
+说明：上述 `.env.production` 对应“网关保留 `/nl2sql` 前缀，且前端入口为 `/nl2sql/front/index.html`”的部署方式。如果生产环境改为“网关剥离 `/nl2sql` 前缀”，则应回退到 `VITE_FRONT_BASE=/`、`VITE_API_BASE=`。
 
 **Vite 配置**：
 
@@ -182,6 +248,8 @@ export default {
   base: FRONT_BASE,
 }
 ```
+
+要求：生产构建前必须校验 `VITE_FRONT_BASE` 与静态资源实际暴露路径一致。对于当前 `/front/**` 资源映射，`VITE_FRONT_BASE` 必须以 `/front/` 结尾；在网关保留 `/nl2sql` 前缀时，必须为 `/nl2sql/front/`。
 
 **Vue Router**：
 
@@ -258,13 +326,22 @@ registry.addResourceHandler(basePath + "/front/**")
 
 `SpaWebFilter` 拦截前端路由路径（非 API、非静态资源），返回 `index.html`。
 
+为兼容网关剥离 `/nl2sql` 前缀后的部署模式，`SpaWebFilter` 同时支持：
+
+- 根路径前端路由：`/agents`、`/agent/1/run`、`/user-agent/1/run`
+- 旧前端路径：`/front/agents`、`/front/model-config`、`/front/agent/1/run`
+- 排除后端接口和静态资源：`/api/**`、`/uploads/**`、`/assets/**`、`/front/assets/**`、`/actuator/**`、`/v3/api-docs/**`、`/swagger-ui/**`、`/h2-console/**`、`/mcp/**`
+
+注意：`SpaWebFilter` 生效的前提是前端路由请求必须先穿过 `JwtAuthenticationWebFilter`。因此两个 Filter 的路径边界必须一致：前端页面路由由 `JwtAuthenticationWebFilter` 放行，再由 `SpaWebFilter` fallback 到 `index.html`；只有真正的后端接口路径才由 JWT 过滤器强制鉴权。
+
 ## 部署场景矩阵
 
-| 场景 | base-path | auth.enabled | 行为 |
-|------|-----------|-------------|------|
-| 开发环境 | `""` | `false` | 完全兼容原有行为 |
-| 生产环境（网关下） | `/nl2sql` | `true` | SSO + 用户隔离 |
-| 独立部署 | `""` | `true` | 有认证但无前缀 |
+| 场景 | 网关是否剥离 `/nl2sql` | base-path | auth.enabled | 前端 base | API base | 行为 |
+|------|--------------------------|-----------|-------------|-----------|----------|------|
+| 开发环境 | 无网关 | `""` | `false` | `/` | `""` | 完全兼容原有行为 |
+| 生产环境（网关剥离前缀） | 是 | `""` | `true` | `/` | `""` | `/nl2sql/agents` 转发为 `/agents`，SSO + 用户隔离 |
+| 生产环境（网关保留前缀） | 否 | `/nl2sql` | `true` | `/nl2sql/front/` | `/nl2sql` | 首页从 `/nl2sql/front/index.html` 访问，静态资源与 API 都通过网关前缀访问 |
+| 独立部署 | 无网关 | `""` | `true` | `/` | `""` | 有认证但无前缀 |
 
 ## 对源项目的影响
 
