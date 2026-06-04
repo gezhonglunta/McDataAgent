@@ -262,19 +262,82 @@ const router = createRouter({
 
 ### API 请求改造
 
-**Axios 拦截器**（`services/common.ts`）：
+前端调用普通 HTTP API 时，必须在发送请求前从浏览器 cookie 中读取当前网关对应的 token，并显式设置 `Authorization: Bearer <token>` 请求头。
+
+**cookie 命名规则**：
+
+- 优先读取 `Admin_<gateway-host>_<gateway-port>`
+- 若不存在，再读取 `Bearer_<gateway-host>_<gateway-port>`
+- 例如当前网关地址为 `190.160.2.132:8180` 时，优先读取 `Admin_190.160.2.132_8180`，否则退化到 `Bearer_190.160.2.132_8180`
+
+说明：这里的 `<gateway-host>` 和 `<gateway-port>` 必须基于浏览器当前访问地址动态计算，不能写死固定值，也不能继续假设 cookie 名恒为 `Bearer`。
+
+**公共请求封装**（`services/common.ts`）：
 
 ```ts
-axiosInstance.interceptors.request.use(config => {
-  const match = document.cookie.match(/Bearer=([^;]+)/)
-  if (match) {
-    config.headers.Authorization = `Bearer ${match[1]}`
+const currentGatewayPort = (): string => {
+  if (window.location.port) {
+    return window.location.port
+  }
+  return window.location.protocol === 'https:' ? '443' : '80'
+}
+
+const bearerToken = (): string | null => {
+  const cookies = parseCookies()
+  const port = currentGatewayPort()
+  const adminCookieName = `Admin_${window.location.hostname}_${port}`
+  const bearerCookieName = `Bearer_${window.location.hostname}_${port}`
+
+  return cookies[adminCookieName]
+    || cookies[bearerCookieName]
+    || null
+}
+
+export const authHeaders = (): Record<string, string> => {
+  const token = bearerToken()
+  return token ? { Authorization: `Bearer ${token}` } : {}
+}
+
+axios.interceptors.request.use(config => {
+  const token = bearerToken()
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`
   }
   return config
 })
 ```
 
-从 cookie 读取 Bearer token，读取不到则不加入 Authorization header。
+`apiFetch` 与 axios 请求拦截器都必须复用同一套 `bearerToken()` / `authHeaders()` 逻辑，避免部分接口漏传 `Authorization`。
+
+边界说明：
+
+- 仅普通 API 请求需要补充 `Authorization` 头
+- 前端页面路由访问不需要携带该 header
+- SSE 推送相关请求本次暂不处理 `Authorization` 透传问题，后续如有需要再单独设计
+
+### 模型配置检查与 401 处理
+
+前端全局路由守卫在进入业务页面前，会先调用 `/api/model-config/check-ready` 检查聊天模型和嵌入模型是否已完成配置。该逻辑用于区分“系统尚未完成模型初始化”和“页面本身可访问但运行能力不可用”两类状态。
+
+前端需要提供统一的“未授权处理”公共方法，至少包含两部分能力：
+
+- `isUnauthorizedError()`：统一识别 HTTP `401/403` 与业务 `401/403`
+- `redirectToLoginWithPrompt()`：弹出“未登录，请先登录。”提示框，确认后通过 `window.location.href = '/admin/sso/admin/login'` 跳转到 SSO 登录页
+
+模型配置相关接口不得各自散落实现未授权分支，`/api/model-config/check-ready` 与 `/api/model-config/list` 都应复用这套公共逻辑，保证用户在不同入口下看到一致的交互行为。
+
+路由守卫行为约定：
+
+- `/model-config` 页面本身直接放行，避免检查接口再次触发重定向
+- `check-ready` 成功且 `ready=false` 时，提示用户补充模型配置，并跳转到 `/model-config`
+- `check-ready` 返回 HTTP `401` 或 `403` 时，不再误判为“模型未配置”
+- `check-ready` 返回业务 `401` 或业务 `403` 时，同样视为未授权。业务未授权的判定规则为：HTTP status 为 `200`，但响应体满足 `code == 401` 或 `code == 403`，其中 `code` 可为字符串或数值类型，只按 `code` 值判断
+- `401/403` 场景下应先弹出提示框：`未登录，请先登录。`
+- 用户点击确定后，通过 `window.location.href = '/admin/sso/admin/login'` 跳转到 SSO 登录页
+- 这里必须使用浏览器整页跳转，而不是 `router.push()`，避免 `/admin/sso/admin/login` 被前端 SPA 路由错误接管
+- 除 `401/403` 外的其他异常，仍按“模型状态检查失败”处理，提示后跳转到 `/model-config`
+
+这样可以解决用户直接访问 `/user-agent/:id/run` 等前端路由时，因未登录或无权限导致 `/api/model-config/check-ready` 返回 HTTP `401/403` 或业务 `401/403`，却被错误重定向到 `/model-config` 的问题。认证失败与模型未配置在交互上必须分开处理：前者进入 SSO 登录流程，后者进入模型配置流程。
 
 ### 新增用户级路由
 

@@ -339,6 +339,7 @@
   import { Plus, Refresh, Cpu } from '@element-plus/icons-vue';
   import BaseLayout from '@/layouts/BaseLayout.vue';
   import modelConfigService, { type ModelConfig } from '@/services/modelConfig';
+  import { isUnauthorizedError, redirectToLoginWithPrompt } from '@/services/common';
 
   export default defineComponent({
     name: 'ModelConfig',
@@ -473,6 +474,12 @@
           const response = await modelConfigService.list();
           configs.value = response || [];
         } catch (error) {
+          if (isUnauthorizedError(error)) {
+            redirectToLoginWithPrompt();
+            configs.value = [];
+            return;
+          }
+
           ElMessage.error('获取模型配置列表失败，请检查网络！');
           configs.value = [];
         } finally {

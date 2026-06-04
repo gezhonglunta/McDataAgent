@@ -15,7 +15,7 @@
  */
 
 import axios from 'axios';
-import { apiUrl } from './common';
+import { apiUrl, createUnauthorizedError, isUnauthorizedResponseData } from './common';
 import type { ApiResponse } from './common';
 
 export interface ModelConfig {
@@ -51,6 +51,11 @@ class ModelConfigService {
    */
   async list(): Promise<ModelConfig[]> {
     const response = await axios.get<ApiResponse<ModelConfig[]>>(`${API_BASE_URL}/list`);
+
+    if (isUnauthorizedResponseData(response.data)) {
+      throw createUnauthorizedError(response.data);
+    }
+
     return response.data.data || [];
   }
 
@@ -105,6 +110,11 @@ class ModelConfigService {
    */
   async checkReady(): Promise<ModelCheckReady> {
     const response = await axios.get<ApiResponse<ModelCheckReady>>(`${API_BASE_URL}/check-ready`);
+
+    if (isUnauthorizedResponseData(response.data)) {
+      throw createUnauthorizedError(response.data);
+    }
+
     return (
       response.data.data || { chatModelReady: false, embeddingModelReady: false, ready: false }
     );

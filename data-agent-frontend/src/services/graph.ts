@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import { apiUrl } from './common';
+import { connectSse } from './sse';
 
 export interface GraphRequest {
   agentId: string;
@@ -77,50 +77,60 @@ class GraphService {
       params.append('humanFeedbackContent', request.humanFeedbackContent);
     }
 
-    const url = apiUrl(`${API_BASE_URL}/stream/search?${params.toString()}`);
-
-    const eventSource = new EventSource(url);
-
-    eventSource.onmessage = async event => {
-      try {
-        const nodeResponse: GraphNodeResponse = JSON.parse(event.data);
-        console.log(
-          `Node: ${nodeResponse.nodeName}, message: ${nodeResponse.text}, type: ${nodeResponse.textType}`,
-        );
-        await onMessage(nodeResponse);
-      } catch (parseError) {
-        console.error('Failed to parse SSE data:', parseError);
-        if (onError) {
-          await onError(new Error('Failed to parse server response'));
-        }
-      }
-    };
-
     let isCompleted = false;
+    let connectionClosed = false;
+    let connection = connectSse(`${API_BASE_URL}/stream/search?${params.toString()}`, {
+      onEvent: async event => {
+        if (event.event === 'complete') {
+          isCompleted = true;
+          if (onComplete) {
+            await onComplete();
+          }
+          connectionClosed = true;
+          connection.close();
+          return;
+        }
 
-    eventSource.onerror = async error => {
-      // 如果已经完成，忽略错误（可能是正常关闭）
-      if (isCompleted) {
-        return;
-      }
-      console.error('EventSource error:', error);
-      if (onError) {
-        await onError(new Error('Stream connection failed'));
-      }
-      eventSource.close();
-    };
+        if (event.event !== 'message') {
+          return;
+        }
 
-    eventSource.addEventListener('complete', async () => {
-      isCompleted = true;
-      if (onComplete) {
-        await onComplete();
-      }
-      eventSource.close();
+        try {
+          const nodeResponse: GraphNodeResponse = JSON.parse(event.data);
+          console.log(
+            `Node: ${nodeResponse.nodeName}, message: ${nodeResponse.text}, type: ${nodeResponse.textType}`,
+          );
+          await onMessage(nodeResponse);
+        } catch (parseError) {
+          console.error('Failed to parse SSE data:', parseError);
+          if (onError) {
+            await onError(new Error('Failed to parse server response'));
+          }
+        }
+      },
+      onError: async error => {
+        if (isCompleted || connectionClosed) {
+          return;
+        }
+        console.error('SSE error:', error);
+        if (onError) {
+          await onError(new Error('Stream connection failed'));
+        }
+      },
+      onClose: async () => {
+        if (isCompleted || connectionClosed) {
+          return;
+        }
+        if (onError) {
+          await onError(new Error('Stream connection closed'));
+        }
+      },
     });
 
     // 返回关闭函数，允许外部控制
     return () => {
-      eventSource.close();
+      connectionClosed = true;
+      connection.close();
     };
   }
 }

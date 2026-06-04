@@ -1184,7 +1184,7 @@
             return;
           }
 
-          // 关闭 EventSource 连接
+          // 关闭 SSE 连接
           sessionState.closeStream();
           sessionState.closeStream = null;
 

@@ -18,6 +18,9 @@ import { createRouter, createWebHistory } from 'vue-router';
 import { ElMessage } from 'element-plus';
 import routes from '@/router/routes';
 import modelConfigService from '@/services/modelConfig';
+import { isUnauthorizedError, redirectToLoginWithPrompt } from '@/services/common';
+
+const appTitle = import.meta.env.VITE_APP_TITLE || 'Spring AI Alibaba Data Agent';
 
 // 创建路由实例
 const router = createRouter({
@@ -39,9 +42,9 @@ let hasShownWarning = false;
 router.beforeEach(async (to, from, next) => {
   // 设置页面标题
   if (to.meta?.title) {
-    document.title = `${to.meta.title} - Spring AI Alibaba Data Agent`;
+    document.title = `${to.meta.title} - ${appTitle}`;
   } else {
-    document.title = 'Spring AI Alibaba Data Agent';
+    document.title = appTitle;
   }
 
   if (to.path === '/model-config') {
@@ -84,6 +87,13 @@ router.beforeEach(async (to, from, next) => {
     next();
   } catch (error) {
     console.error('检查模型配置失败:', error);
+
+    if (isUnauthorizedError(error)) {
+      next(false);
+      redirectToLoginWithPrompt();
+
+      return;
+    }
 
     // 如果检查失败，也重定向到配置页面
     if (!hasShownWarning) {

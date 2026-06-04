@@ -127,7 +127,7 @@
   import { useRouter, useRoute } from 'vue-router';
   import { ElMessage, ElMessageBox } from 'element-plus';
   import ChatService from '../../services/chat';
-  import { apiUrl } from '../../services/common';
+  import { connectSse, type SseConnection } from '../../services/sse';
   import {
     Plus,
     Delete,
@@ -188,7 +188,7 @@
     setup(props) {
       const sessions = ref<ExtendedChatSession[]>([]);
       const collapsed = ref(false);
-      const sessionEventSource = ref<EventSource | null>(null);
+      const sessionEventConnection = ref<SseConnection | null>(null);
       let reconnectTimer: number | null = null;
       let isComponentActive = true;
 
@@ -206,6 +206,14 @@
           window.clearTimeout(reconnectTimer);
           reconnectTimer = null;
         }
+      };
+
+      const scheduleReconnect = () => {
+        if (!isComponentActive) {
+          return;
+        }
+        clearReconnectTimer();
+        reconnectTimer = window.setTimeout(() => connectSessionStream(), 3000);
       };
 
       const handleTitleUpdate = (eventData: SessionUpdateEvent) => {
@@ -229,27 +237,37 @@
         if (!currentAgentId) {
           return;
         }
-        if (sessionEventSource.value) {
-          sessionEventSource.value.close();
+        if (sessionEventConnection.value) {
+          sessionEventConnection.value.close();
+          sessionEventConnection.value = null;
         }
-        const source = new EventSource(apiUrl(`/api/agent/${currentAgentId}/sessions/stream`));
-        source.addEventListener('title-updated', event => {
-          try {
-            const data = JSON.parse((event as MessageEvent<string>).data) as SessionUpdateEvent;
-            handleTitleUpdate(data);
-          } catch (error) {
-            console.error('解析会话标题更新失败', error);
-          }
+        const connection = connectSse(`/api/agent/${currentAgentId}/sessions/stream`, {
+          onEvent: async event => {
+            if (event.event !== 'title-updated') {
+              return;
+            }
+            try {
+              const data = JSON.parse(event.data) as SessionUpdateEvent;
+              handleTitleUpdate(data);
+            } catch (error) {
+              console.error('解析会话标题更新失败', error);
+            }
+          },
+          onError: async error => {
+            console.error('会话推送连接异常:', error);
+            if (sessionEventConnection.value === connection) {
+              sessionEventConnection.value = null;
+            }
+            scheduleReconnect();
+          },
+          onClose: async () => {
+            if (sessionEventConnection.value === connection) {
+              sessionEventConnection.value = null;
+            }
+            scheduleReconnect();
+          },
         });
-        source.onerror = error => {
-          console.error('会话推送连接异常:', error);
-          source.close();
-          sessionEventSource.value = null;
-          if (isComponentActive) {
-            reconnectTimer = window.setTimeout(() => connectSessionStream(), 3000);
-          }
-        };
-        sessionEventSource.value = source;
+        sessionEventConnection.value = connection;
       };
 
       // 开始编辑会话标题
@@ -393,9 +411,9 @@
       onUnmounted(() => {
         isComponentActive = false;
         clearReconnectTimer();
-        if (sessionEventSource.value) {
-          sessionEventSource.value.close();
-          sessionEventSource.value = null;
+        if (sessionEventConnection.value) {
+          sessionEventConnection.value.close();
+          sessionEventConnection.value = null;
         }
       });
 
