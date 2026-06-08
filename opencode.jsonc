@@ -1,5 +1,18 @@
 ﻿{
     "$schema": "https://opencode.ai/config.json",
+    "mcp":
+    {
+        "codegraph":
+        {
+            "type": "local",
+            "enabled": true,
+            "command": [
+                "codegraph",
+                "serve",
+                "--mcp"
+            ]
+        }
+    },
     "watcher":
     {
         "ignore": ["node_modules/**", "dist/**", ".git/**", "logs/**", "**/logs/**", "target/**", "**/target/**", "**/work/**", ".mc", ".idea", ".wiscode", ".opencode", "src/main/resources/static/**", "src/main/resources/templates/**", "lib/**", "extlib/**", "extlib-boot/**", "*.zip", "*.tar", "data-agent-frontend/**", "CI/**", "**/vectorstore/**", "docker-file/**", ".idea/**", ".github/**", ".mvn/**"]

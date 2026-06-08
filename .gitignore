@@ -67,3 +67,4 @@ spring-ai-alibaba-1.1.0.0/
 ./data-agent-frontend/package-lock.json
 package-lock.json
 /docs/jwtTokenDemo
+.codegraph

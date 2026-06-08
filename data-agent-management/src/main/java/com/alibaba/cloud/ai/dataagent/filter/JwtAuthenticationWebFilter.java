@@ -95,6 +95,7 @@ public class JwtAuthenticationWebFilter implements WebFilter {
 		if (user != null) {
 			log.debug("JWT authentication succeeded: path={}, claim={}, userId={}", path, jwtClaimName,
 					maskUserId(user.getUserId()));
+			UserContextHolder.write(exchange, user);
 			return chain.filter(exchange)
 				.contextWrite(ctx -> UserContextHolder.write(ctx, user))
 				.doFinally(signal -> UserContextHolder.clear());
@@ -117,13 +118,14 @@ public class JwtAuthenticationWebFilter implements WebFilter {
 		if ("/".equals(path) || "/index.html".equals(path)) {
 			return true;
 		}
+		if (path.startsWith("/front/assets") || path.startsWith("/assets") || path.startsWith("/front/vendor")
+				|| path.startsWith("/vendor")) {
+			return true;
+		}
 		if (path.startsWith("/front/") && !path.startsWith("/front/api/") && !path.startsWith("/front/assets")) {
 			return !path.contains(".");
 		}
 		if (path.contains(".")) {
-			return true;
-		}
-		if (path.startsWith("/front/assets") || path.startsWith("/assets")) {
 			return true;
 		}
 		return false;

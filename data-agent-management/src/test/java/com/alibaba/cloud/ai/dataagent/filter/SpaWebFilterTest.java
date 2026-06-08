@@ -38,6 +38,10 @@ class SpaWebFilterTest {
 		assertThat(SpaWebFilter.shouldFallbackToIndex("/uploads/avatar.png", "")).isFalse();
 		assertThat(SpaWebFilter.shouldFallbackToIndex("/assets/index.js", "")).isFalse();
 		assertThat(SpaWebFilter.shouldFallbackToIndex("/front/assets/index.js", "")).isFalse();
+		assertThat(SpaWebFilter.shouldFallbackToIndex("/vendor/highlightjs/11.9.0/atom-one-dark.min.css", ""))
+			.isFalse();
+		assertThat(SpaWebFilter.shouldFallbackToIndex("/front/vendor/highlightjs/11.9.0/atom-one-dark.min.css", ""))
+			.isFalse();
 	}
 
 }

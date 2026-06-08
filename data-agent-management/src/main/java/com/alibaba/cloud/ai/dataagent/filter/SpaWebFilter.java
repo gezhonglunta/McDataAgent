@@ -64,7 +64,8 @@ public class SpaWebFilter implements WebFilter {
 				|| normalizedPath.startsWith("/mcp")) {
 			return false;
 		}
-		if (normalizedPath.startsWith("/front/assets") || normalizedPath.startsWith("/assets")) {
+		if (normalizedPath.startsWith("/front/assets") || normalizedPath.startsWith("/assets")
+				|| normalizedPath.startsWith("/front/vendor") || normalizedPath.startsWith("/vendor")) {
 			return false;
 		}
 		return true;

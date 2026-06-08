@@ -98,6 +98,10 @@ class JwtAuthenticationWebFilterTest {
 		assertThat(JwtAuthenticationWebFilter.shouldSkipAuth("/index.html")).isTrue();
 		assertThat(JwtAuthenticationWebFilter.shouldSkipAuth("/assets/index.js")).isTrue();
 		assertThat(JwtAuthenticationWebFilter.shouldSkipAuth("/front/assets/index.css")).isTrue();
+		assertThat(JwtAuthenticationWebFilter.shouldSkipAuth("/vendor/highlightjs/11.9.0/atom-one-dark.min.css"))
+			.isTrue();
+		assertThat(JwtAuthenticationWebFilter.shouldSkipAuth("/front/vendor/highlightjs/11.9.0/atom-one-dark.min.css"))
+			.isTrue();
 		assertThat(JwtAuthenticationWebFilter.shouldSkipAuth("/favicon.ico")).isTrue();
 	}
 
