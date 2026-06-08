@@ -66,6 +66,8 @@ import static com.alibaba.cloud.ai.dataagent.util.DocumentConverterUtil.convertT
 @AllArgsConstructor
 public class SchemaServiceImpl implements SchemaService {
 
+	private static final int FILTER_TABLE_NAME_BATCH_SIZE = 50;
+
 	private final ExecutorService dbOperationExecutor;
 
 	private final AccessorFactory accessorFactory;
@@ -496,6 +498,13 @@ public class SchemaServiceImpl implements SchemaService {
 		Assert.notNull(datasourceId, "DatasourceId cannot be null.");
 		if (tableNames.isEmpty())
 			return Collections.emptyList();
+		if (tableNames.size() > FILTER_TABLE_NAME_BATCH_SIZE) {
+			List<Document> documents = new ArrayList<>();
+			for (List<String> tableNameBatch : partitionTableNames(tableNames)) {
+				documents.addAll(getTableDocuments(datasourceId, tableNameBatch));
+			}
+			return documents;
+		}
 		// 通过元数据过滤查找目标表
 		Filter.Expression filterExpression = DynamicFilterService.buildFilterExpressionForSearchTables(datasourceId,
 				tableNames);
@@ -513,6 +522,13 @@ public class SchemaServiceImpl implements SchemaService {
 			log.warn("TableNames is empty.We need talbeNames to search their columns");
 			return Collections.emptyList();
 		}
+		if (tableNames.size() > FILTER_TABLE_NAME_BATCH_SIZE) {
+			List<Document> documents = new ArrayList<>();
+			for (List<String> tableNameBatch : partitionTableNames(tableNames)) {
+				documents.addAll(getColumnDocumentsByTableName(datasourceId, tableNameBatch));
+			}
+			return documents;
+		}
 		Filter.Expression filterExpression = dynamicFilterService.buildFilterExpressionForSearchColumns(datasourceId,
 				tableNames);
 		if (filterExpression == null) {
@@ -523,6 +539,15 @@ public class SchemaServiceImpl implements SchemaService {
 		// TopK=表数量×最大预估列数
 		return agentVectorStoreService.getDocumentsOnlyByFilter(filterExpression,
 				tableNames.size() * dataAgentProperties.getMaxColumnsPerTable());
+	}
+
+	private List<List<String>> partitionTableNames(List<String> tableNames) {
+		List<List<String>> partitions = new ArrayList<>();
+		for (int start = 0; start < tableNames.size(); start += FILTER_TABLE_NAME_BATCH_SIZE) {
+			int end = Math.min(start + FILTER_TABLE_NAME_BATCH_SIZE, tableNames.size());
+			partitions.add(tableNames.subList(start, end));
+		}
+		return partitions;
 	}
 
 }
