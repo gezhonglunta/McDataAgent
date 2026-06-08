@@ -18,8 +18,11 @@ package com.alibaba.cloud.ai.dataagent.util;
 import com.alibaba.cloud.ai.dataagent.dto.JwtUser;
 import reactor.core.publisher.Mono;
 import reactor.util.context.Context;
+import org.springframework.web.server.ServerWebExchange;
 
 public class UserContextHolder {
+
+	private static final String USER_ATTRIBUTE_KEY = JwtUser.class.getName();
 
 	private static final ThreadLocal<JwtUser> THREAD_LOCAL = new ThreadLocal<>();
 
@@ -40,6 +43,18 @@ public class UserContextHolder {
 	public static String getCurrentUserId() {
 		JwtUser user = THREAD_LOCAL.get();
 		return user != null ? user.getUserId() : null;
+	}
+
+	public static void write(ServerWebExchange exchange, JwtUser user) {
+		exchange.getAttributes().put(USER_ATTRIBUTE_KEY, user);
+	}
+
+	public static String getCurrentUserId(ServerWebExchange exchange) {
+		Object user = exchange.getAttribute(USER_ATTRIBUTE_KEY);
+		if (user instanceof JwtUser jwtUser) {
+			return jwtUser.getUserId();
+		}
+		return getCurrentUserId();
 	}
 
 	public static void clear() {

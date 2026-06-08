@@ -22,6 +22,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
 import org.springframework.http.codec.ServerSentEvent;
+import org.springframework.web.server.ServerWebExchange;
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Flux;
 import org.springframework.http.server.reactive.ServerHttpResponse;
@@ -37,12 +38,12 @@ public class SessionEventController {
 
 	@GetMapping(value = "/agent/{agentId}/sessions/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
 	public Flux<ServerSentEvent<SessionUpdateEvent>> streamSessionUpdates(@PathVariable Integer agentId,
-			ServerHttpResponse response) {
+			ServerHttpResponse response, ServerWebExchange exchange) {
 		response.getHeaders().add("Cache-Control", "no-cache");
 		response.getHeaders().add("Connection", "keep-alive");
 		response.getHeaders().add("Access-Control-Allow-Origin", "*");
 
-		String userId = UserContextHolder.getCurrentUserId();
+		String userId = UserContextHolder.getCurrentUserId(exchange);
 		log.debug("Client subscribed to session update stream for agent {}, user {}", agentId, userId);
 		return sessionEventPublisher.register(agentId, userId)
 			.doFinally(
