@@ -30,7 +30,7 @@ spring:
       data-agent:
         vector-store:
           table-topk-limit: 1000
-          table-similarity-threshold: 0.5
+          table-similarity-threshold: 0.3
           default-topk-limit: 8
           default-similarity-threshold: 0.4
         llm-service-type: stream
