@@ -80,7 +80,7 @@ public class SimpleVectorStoreInitialization implements ApplicationRunner, Dispo
 
 	@Override
 	public void destroy() {
-		this.save();
+		//this.save();
 	}
 
 }

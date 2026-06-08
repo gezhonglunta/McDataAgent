@@ -16,6 +16,8 @@
 package com.alibaba.cloud.ai.dataagent.controller;
 
 import com.alibaba.cloud.ai.dataagent.dto.search.VectorStoreSearchTestRequest;
+import com.alibaba.cloud.ai.dataagent.service.ApplicationContextHelper;
+import com.alibaba.cloud.ai.dataagent.service.vectorstore.SimpleVectorStoreInitialization;
 import com.alibaba.cloud.ai.dataagent.vo.ApiResponse;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -60,10 +62,20 @@ public class VectorStoreTestController {
 
 			List<Document> documents = vectorStore.similaritySearch(builder.build());
 			return ApiResponse.success("success search vector store", documents);
-		}
-		catch (Exception e) {
+		} catch (Exception e) {
 			log.error("Failed to test vector store search", e);
 			return ApiResponse.error("Failed to search vector store: " + e.getMessage());
+		}
+	}
+
+	@PostMapping("/save")
+	public ApiResponse<Boolean> save() {
+		SimpleVectorStoreInitialization initialization = ApplicationContextHelper.getBean(SimpleVectorStoreInitialization.class);
+		if (initialization != null) {
+			initialization.save();
+			return ApiResponse.success("成功");
+		} else {
+			return ApiResponse.success("非simple向量类型", false);
 		}
 	}
 
