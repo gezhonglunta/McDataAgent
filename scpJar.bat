@@ -1,5 +1,6 @@
 @echo off
 
+set scp_frontend=0
 set host=190.160.13.13
 set port=20030
 set remote_base=/appdata/dataAgent
@@ -9,12 +10,14 @@ set local_frontend=.\data-agent-frontend
 set local_frontend_dist=%local_frontend%\dist
 set local_jar=.\data-agent-management\target\spring-ai-alibaba-data-agent-management-1.0.0-SNAPSHOT.jar
 
-if exist %local_frontend_dist% (
-    echo 同步前端文件
-    ssh -p %port% root@%host% "rm -rf %remote_frontend%/dist"
-    scp -P %port% -r %local_frontend_dist% root@%host%:%remote_frontend%/
-) else (
-    echo 前端dist目录不存在，跳过同步前端文件
+if "scp_frontend" == "1" (
+    if exist %local_frontend_dist% (
+        echo 同步前端文件
+        ssh -p %port% root@%host% "rm -rf %remote_frontend%/dist"
+        scp -P %port% -r %local_frontend_dist% root@%host%:%remote_frontend%/
+    ) else (
+        echo 前端dist目录不存在，跳过同步前端文件
+    )
 )
 
 if not exist %local_jar% (

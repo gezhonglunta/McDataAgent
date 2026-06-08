@@ -1,0 +1,8 @@
+# 存储 DataAgent 业务数据的数据库，并非Agent分析数据的来源
+spring:
+  datasource:
+    url: ${DATA_AGENT_DATASOURCE_URL:jdbc:mysql://190.160.13.13:20032/saa_data_agent_beta?useSSL=false&allowPublicKeyRetrieval=true&useUnicode=true&characterEncoding=utf-8&zeroDateTimeBehavior=convertToNull&transformedBitIsBoolean=true&allowMultiQueries=true&serverTimezone=Asia/Shanghai}
+    username: ${DATA_AGENT_DATASOURCE_USERNAME:dataAgent}
+    password: ${DATA_AGENT_DATASOURCE_PASSWORD:a123456.}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    type: com.alibaba.druid.pool.DruidDataSource

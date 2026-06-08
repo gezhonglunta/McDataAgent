@@ -78,6 +78,38 @@ public class McDatasourceServiceImpl implements McDatasourceService {
 		syDictValMap.put("code", "字典值编码，用于代码引用");
 		syDictValMap.put("dict_id", "字典id，关联 sy_dict.dict_id 的外键");
 		syDictValMap.put("dict_val_id", "字典值id，主键");
+
+		Map<String, String> syUserMap = new HashMap<>(8);
+		COLUMN_INFO_MAP.put("sy_user", syUserMap);
+		syUserMap.put("id", "用户id，主键");
+		syUserMap.put("name", "用户姓名");
+		syUserMap.put("login_name", "用户登录名");
+		syUserMap.put("enable", "启用状态，1-启动，0-未启用");
+		syUserMap.put("deleted", "逻辑删除状态，1-已删除，0-未删除");
+		syUserMap.put("three_member_user", "是否三员账号,1-是,0-否");
+		syUserMap.put("is_system", "是否系统用户,1-系统用户（三员3个账号、单员admin账号、数字大屏账号） 0-非系统用户");
+		syUserMap.put("login_type", "是否开发者，0-操作员，1-开发者");
+
+		Map<String, String> syDeptMap = new HashMap<>(8);
+		COLUMN_INFO_MAP.put("sy_dept", syDeptMap);
+		syDeptMap.put("id", "(组织机构/部门)id，主键");
+		syDeptMap.put("up_id", "上级单位ID");
+		syDeptMap.put("name", "单位名称");
+		syDeptMap.put("is_auth", "是否是组织机构，1-是，0-否；为否是表示当前记录为部门");
+		syDeptMap.put("deleted", "逻辑删除状态，1-已删除，0-未删除");
+		syDeptMap.put("dep_sn", "部门编码");
+
+		Map<String, String> syRoleMap = new HashMap<>(8);
+		COLUMN_INFO_MAP.put("sy_role", syRoleMap);
+		syRoleMap.put("id", "角色id，主键");
+		syRoleMap.put("name", "角色名称");
+		syRoleMap.put("remark", "描述，备注");
+		syRoleMap.put("three_member_role", "是否三员角色,1-是,0-否");
+		syRoleMap.put("is_system", "是否系统角色,1-系统角色（三员3个角色、单员1个管理员角色），0-非系统角色");
+		syRoleMap.put("role_type", "角色类型,normal-通用角色，buss-业务角色");
+		syRoleMap.put("data_range", "数据范围，all-全部组织机构，custom-自定组织机构");
+		syRoleMap.put("use_case", "使用场景，share-多组织共享角色，cross-跨组织数据维护");
+
 	}
 
 	@Override
@@ -101,13 +133,12 @@ public class McDatasourceServiceImpl implements McDatasourceService {
 		try {
 			int agentDatasourceId = agentDatasourceMapper.getIdByAgentIdAndDatasourceId(agentId, datasourceId);
 			tableNames = tablesMapper.getAgentDatasourceTables(agentDatasourceId)
-				.stream()
-				.filter(Objects::nonNull)
-				.map(table -> table.trim().toUpperCase(Locale.ROOT))
-				.filter(table -> !table.isEmpty())
-				.toList();
-		}
-		catch (Exception e) {
+					.stream()
+					.filter(Objects::nonNull)
+					.map(table -> table.trim().toUpperCase(Locale.ROOT))
+					.filter(table -> !table.isEmpty())
+					.toList();
+		} catch (Exception e) {
 			log.error("找不到智能体的数据源配置：agentId={},datasourceId={}", agentId, datasourceId, e);
 			return;
 		}
@@ -147,8 +178,7 @@ public class McDatasourceServiceImpl implements McDatasourceService {
 		ResultSetBO resultSetBO;
 		try {
 			resultSetBO = accessor.executeSqlAndReturnObject(dbConfig, queryParameter);
-		}
-		catch (Exception e) {
+		} catch (Exception e) {
 			throw new RuntimeException(
 					"Failed to query MC metadata for datasource " + datasourceId + ": " + e.getMessage(), e);
 		}
@@ -162,18 +192,18 @@ public class McDatasourceServiceImpl implements McDatasourceService {
 		}
 
 		List<LogicalRelation> logicalRelations = rows.stream()
-			.map(row -> LogicalRelation.builder()
-				.datasourceId(datasourceId)
-				.sourceTableName(lower(row.get("src_table_name")))
-				.sourceColumnName(lower(row.get("src_table_col_no")))
-				.targetTableName(lower(row.get("dst_table_name")))
-				.targetColumnName(lower(row.get("dst_table_col_no")))
-				.relationType("1:1")
-				.description(String.format("%s通过%s关联%s%s", ensureTableSuffix(row.get("src_orm_name")),
-						lower(row.get("src_table_col_no")), ensureTableSuffix(row.get("dst_orm_name")),
-						lower(row.get("dst_table_col_no"))))
-				.build())
-			.toList();
+				.map(row -> LogicalRelation.builder()
+						.datasourceId(datasourceId)
+						.sourceTableName(lower(row.get("src_table_name")))
+						.sourceColumnName(lower(row.get("src_table_col_no")))
+						.targetTableName(lower(row.get("dst_table_name")))
+						.targetColumnName(lower(row.get("dst_table_col_no")))
+						.relationType("1:1")
+						.description(String.format("%s通过%s关联%s%s", ensureTableSuffix(row.get("src_orm_name")),
+								lower(row.get("src_table_col_no")), ensureTableSuffix(row.get("dst_orm_name")),
+								lower(row.get("dst_table_col_no"))))
+						.build())
+				.toList();
 		log.info("开始删除全部的关联关系，AgentId={},DataSourceId={}", agentId, datasourceId);
 		logicalRelationMapper.deleteAll(datasourceId);
 		datasourceService.saveLogicalRelations(datasourceId, logicalRelations);
@@ -192,6 +222,9 @@ public class McDatasourceServiceImpl implements McDatasourceService {
 					&& (mcDesc = mcTableList.get(table.getName().toUpperCase())) != null) {
 				table.setDescription(mcDesc);
 			}
+			if (StringUtils.isBlank(table.getDescription())) {
+				log.error("缺失表：{} 的描述信息", table.getName());
+			}
 		}
 	}
 
@@ -208,8 +241,7 @@ public class McDatasourceServiceImpl implements McDatasourceService {
 			List<Map<String, String>> rows = resultSetBO != null && resultSetBO.getData() != null
 					? resultSetBO.getData() : Collections.emptyList();
 			return formatDictNamesAsMarkdownTable(rows);
-		}
-		catch (Exception e) {
+		} catch (Exception e) {
 			log.error("查找MC业务表说明失败：datasourceId={}", datasourceId, e);
 		}
 		return "";
@@ -226,16 +258,15 @@ public class McDatasourceServiceImpl implements McDatasourceService {
 			List<Map<String, String>> rows = resultSetBO != null && resultSetBO.getData() != null
 					? resultSetBO.getData() : Collections.emptyList();
 			Set<String> mcTableNames = rows.stream()
-				.map(e -> e.get("table_name"))
-				.map(e -> e.toLowerCase())
-				.collect(Collectors.toSet());
+					.map(e -> e.get("table_name"))
+					.map(e -> e.toLowerCase())
+					.collect(Collectors.toSet());
 			mcTableNames.add("sy_dept");
 			mcTableNames.add("sy_user");
 			mcTableNames.add("sy_role");
 			mcTableNames.add("sy_user_role");
 			return mcTableNames;
-		}
-		catch (Exception e) {
+		} catch (Exception e) {
 			log.error("查找MC业务表说明失败：username={}", dbConfig.getUsername(), e);
 			return new HashSet<>(0);
 		}
@@ -277,8 +308,7 @@ public class McDatasourceServiceImpl implements McDatasourceService {
 		Integer datasourceId = CollectionUtils.isEmpty(semanticModels) ? null : semanticModels.get(0).getDatasourceId();
 		if (datasourceId != null) {
 			params.put("dict_list", listDictNamesForLLM(datasourceId));
-		}
-		else {
+		} else {
 			params.put("dict_list", "");
 		}
 	}
@@ -316,24 +346,26 @@ public class McDatasourceServiceImpl implements McDatasourceService {
 	private Map<String, String> tableDescList(DbConfigBO config, Accessor dbAccessor, List<TableInfoBO> tables) {
 		try {
 			Set<String> tableNames = tables.stream()
-				.map(e -> e.getName())
-				.map(String::toUpperCase)
-				.collect(Collectors.toSet());
+					.map(e -> e.getName())
+					.map(String::toUpperCase)
+					.collect(Collectors.toSet());
 			StringJoiner tableInClause = new StringJoiner(", ");
 			for (String tableName : tableNames) {
 				tableInClause.add("'" + tableName + "'");
 			}
 			String sql = "select table_name,orm_name from ms_orm_model where table_name in (%s)"
-				.formatted(tableInClause.toString());
+					.formatted(tableInClause.toString());
 			DbQueryParameter queryParameter = DbQueryParameter.from(config);
 			queryParameter.setSql(sql);
 			queryParameter.setSchema(config.getSchema());
 			ResultSetBO resultSetBO = dbAccessor.executeSqlAndReturnObject(config, queryParameter);
 			List<Map<String, String>> rows = resultSetBO != null && resultSetBO.getData() != null
 					? resultSetBO.getData() : Collections.emptyList();
-			return rows.stream().collect(Collectors.toMap(e -> e.get("table_name"), e -> e.get("orm_name")));
-		}
-		catch (Exception e) {
+			Map<String, String> result = rows.stream().collect(Collectors.toMap(e -> e.get("table_name"), e -> e.get("orm_name")));
+			result.put("sy_role", "系统角色表");
+			result.put("sy_user_role", "系统用户和角色关系表");
+			return result;
+		} catch (Exception e) {
 			log.error("查找MC业务表说明失败：DbConfig={}", config, e);
 			return new HashMap<>(0);
 		}
