@@ -127,6 +127,8 @@ public class ChatController {
 			// Update session activity time
 			chatSessionService.updateSessionTime(sessionId);
 
+			log.info("Save chat message title generation flag: sessionId={}, role={}, messageType={}, titleNeeded={}",
+					sessionId, request.getRole(), request.getMessageType(), request.isTitleNeeded());
 			if (request.isTitleNeeded()) {
 				sessionTitleService.scheduleTitleGeneration(sessionId, message.getContent());
 			}

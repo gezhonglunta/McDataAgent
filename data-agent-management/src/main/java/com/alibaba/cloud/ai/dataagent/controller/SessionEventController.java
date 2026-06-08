@@ -44,10 +44,25 @@ public class SessionEventController {
 		response.getHeaders().add("Access-Control-Allow-Origin", "*");
 
 		String userId = UserContextHolder.getCurrentUserId(exchange);
+		log.info("Session SSE subscribe request: agentId={}, userId={}, path={}", agentId, maskUserId(userId),
+				exchange.getRequest().getURI().getPath());
 		log.debug("Client subscribed to session update stream for agent {}, user {}", agentId, userId);
 		return sessionEventPublisher.register(agentId, userId)
 			.doFinally(
 					signal -> log.debug("Session update stream finished for agent {} with signal {}", agentId, signal));
+	}
+
+	private String maskUserId(String userId) {
+		if (userId == null) {
+			return "null";
+		}
+		if (userId.isEmpty()) {
+			return "empty";
+		}
+		if (userId.length() <= 6) {
+			return "***";
+		}
+		return userId.substring(0, 3) + "***" + userId.substring(userId.length() - 3);
 	}
 
 }

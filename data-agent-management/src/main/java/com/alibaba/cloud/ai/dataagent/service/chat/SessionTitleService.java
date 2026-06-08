@@ -53,29 +53,45 @@ public class SessionTitleService {
 
 	public void scheduleTitleGeneration(String sessionId, String userMessage) {
 		if (!StringUtils.hasText(sessionId) || !StringUtils.hasText(userMessage)) {
+			log.info("Session title generation skipped before scheduling: sessionId={}, hasMessage={}", sessionId,
+					StringUtils.hasText(userMessage));
 			return;
 		}
 		if (!runningTasks.add(sessionId)) {
+			log.info("Session title generation skipped because task is already running: sessionId={}", sessionId);
 			return;
 		}
+		log.info("Session title generation scheduled: sessionId={}, messageLength={}", sessionId, userMessage.length());
 		CompletableFuture.runAsync(() -> generateAndPersist(sessionId, userMessage), executorService)
-			.whenComplete((unused, throwable) -> runningTasks.remove(sessionId));
+			.whenComplete((unused, throwable) -> {
+				if (throwable != null) {
+					log.warn("Session title generation task completed with error: sessionId={}, error={}", sessionId,
+							throwable.getMessage());
+				}
+				runningTasks.remove(sessionId);
+			});
 	}
 
 	private void generateAndPersist(String sessionId, String userMessage) {
 		try {
+			log.info("Session title generation started: sessionId={}", sessionId);
 			ChatSession session = chatSessionService.findBySessionId(sessionId);
 			if (session == null) {
 				log.warn("Session {} not found when generating title", sessionId);
 				return;
 			}
+			log.info("Session title generation loaded session: sessionId={}, agentId={}, userId={}, currentTitle={}",
+					sessionId, session.getAgentId(), maskUserId(session.getUserId()), session.getTitle());
 			if (hasCustomTitle(session)) {
+				log.info("Session title generation skipped because title is already custom: sessionId={}, title={}",
+						sessionId, session.getTitle());
 				log.debug("Session {} already has custom title, skip generating", sessionId);
 				return;
 			}
 
 			String title = requestSummary(userMessage);
 			if (!StringUtils.hasText(title)) {
+				log.info("Session title generation using fallback title: sessionId={}", sessionId);
 				title = fallbackTitle(userMessage);
 			}
 			title = normalizeTitle(title);
@@ -85,6 +101,8 @@ public class SessionTitleService {
 			}
 
 			chatSessionService.renameSession(sessionId, title);
+			log.info("Session title persisted: sessionId={}, agentId={}, userId={}, title={}", sessionId,
+					session.getAgentId(), maskUserId(session.getUserId()), title);
 			sessionEventPublisher.publishTitleUpdated(session.getAgentId(), session.getUserId(), sessionId, title);
 			log.info("Generated session title '{}' for session {}", title, sessionId);
 		}
@@ -132,6 +150,19 @@ public class SessionTitleService {
 			text = text.substring(0, 20);
 		}
 		return StringUtils.hasText(text) ? text : DEFAULT_TITLE;
+	}
+
+	private String maskUserId(String userId) {
+		if (userId == null) {
+			return "null";
+		}
+		if (userId.isEmpty()) {
+			return "empty";
+		}
+		if (userId.length() <= 6) {
+			return "***";
+		}
+		return userId.substring(0, 3) + "***" + userId.substring(userId.length() - 3);
 	}
 
 }

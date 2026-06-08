@@ -48,22 +48,31 @@ public class SessionEventPublisher {
 		Flux<ServerSentEvent<SessionUpdateEvent>> heartbeat = Flux.interval(Duration.ofSeconds(2))
 			.map(i -> ServerSentEvent.<SessionUpdateEvent>builder().comment("heartbeat").build());
 		sink.increment();
+		log.info("Session SSE registered: agentId={}, userId={}, key={}, subscribers={}, activeKeys={}", agentId,
+				maskUserId(userId), safeKey(agentId, userId), sink.subscribers.get(), sinks.size());
 		log.debug("Registered subscriber for key {}, current count: {}", key, sink.subscribers.get());
 		return Flux.merge(heartbeat, sink.sink.asFlux()).doFinally(signalType -> cleanup(key, sink, signalType));
 	}
 
 	public void publishTitleUpdated(Integer agentId, String userId, String sessionId, String title) {
 		if (agentId == null) {
+			log.warn("Session title SSE skipped because agentId is null: sessionId={}, title={}", sessionId, title);
 			return;
 		}
 		String key = buildKey(agentId, userId);
 		SessionUpdateEvent event = SessionUpdateEvent.titleUpdated(sessionId, title);
 		AgentSessionSink sink = sinks.get(key);
+		log.info("Session title SSE publishing: sessionId={}, agentId={}, userId={}, key={}, hasSink={}, activeKeys={}",
+				sessionId, agentId, maskUserId(userId), safeKey(agentId, userId), sink != null, sinks.size());
 		if (sink == null) {
+			log.warn("Session title SSE skipped: no active subscribers, sessionId={}, key={}, activeKeys={}", sessionId,
+					safeKey(agentId, userId), sinks.size());
 			log.debug("No active subscribers for key {}, skip pushing session title update", key);
 			return;
 		}
 		Sinks.EmitResult result = sink.sink.tryEmitNext(ServerSentEvent.builder(event).event(event.getType()).build());
+		log.info("Session title SSE emitted: sessionId={}, key={}, result={}, subscribers={}", sessionId,
+				safeKey(agentId, userId), result, sink.subscribers.get());
 		if (result.isFailure()) {
 			log.warn("Failed to emit session title update for key {}, session {}, reason {}", key, sessionId, result);
 		}
@@ -71,13 +80,41 @@ public class SessionEventPublisher {
 
 	private void cleanup(String key, AgentSessionSink sink, SignalType signalType) {
 		int current = sink.decrement();
+		log.info("Session SSE cleanup: key={}, signal={}, remainingSubscribers={}, activeKeys={}", safeKey(key), signalType,
+				current, sinks.size());
 		log.debug("Cleanup called for key {}, signal: {}, remaining subscribers: {}", key, signalType, current);
 		if (current <= 0) {
 			if (sinks.remove(key, sink)) {
 				sink.sink.tryEmitComplete();
+				log.info("Session SSE sink removed: key={}, activeKeys={}", safeKey(key), sinks.size());
 				log.debug("Removed session update sink for key {}", key);
 			}
 		}
+	}
+
+	private String safeKey(Integer agentId, String userId) {
+		return agentId + ":" + maskUserId(userId);
+	}
+
+	private String safeKey(String key) {
+		int separatorIndex = key.indexOf(':');
+		if (separatorIndex < 0) {
+			return key;
+		}
+		return key.substring(0, separatorIndex + 1) + maskUserId(key.substring(separatorIndex + 1));
+	}
+
+	private String maskUserId(String userId) {
+		if (userId == null) {
+			return "null";
+		}
+		if (userId.isEmpty()) {
+			return "empty";
+		}
+		if (userId.length() <= 6) {
+			return "***";
+		}
+		return userId.substring(0, 3) + "***" + userId.substring(userId.length() - 3);
 	}
 
 	private static class AgentSessionSink {
