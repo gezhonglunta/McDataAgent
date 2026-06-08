@@ -58,7 +58,6 @@ modified_mcp_config.json
 .idea/LocalCodeIndex/
 
 uploads/*
-**/vectorstore/**
 .java-version
 
 # spring-ai-alibaba source
@@ -68,3 +67,4 @@ spring-ai-alibaba-1.1.0.0/
 package-lock.json
 /docs/jwtTokenDemo
 .codegraph
+/vectorstore

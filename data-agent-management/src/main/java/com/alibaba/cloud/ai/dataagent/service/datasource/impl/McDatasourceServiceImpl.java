@@ -110,6 +110,20 @@ public class McDatasourceServiceImpl implements McDatasourceService {
 		syRoleMap.put("data_range", "数据范围，all-全部组织机构，custom-自定组织机构");
 		syRoleMap.put("use_case", "使用场景，share-多组织共享角色，cross-跨组织数据维护");
 
+		Map<String, String> syUserRoleMap = new HashMap<>(8);
+		COLUMN_INFO_MAP.put("sy_user_role", syUserRoleMap);
+		syUserRoleMap.put("id", "主键");
+		syUserRoleMap.put("user_id", "用户id");
+		syUserRoleMap.put("role_id", "角色id");
+		syUserRoleMap.put("is_main_role", "是否主角色,1-是,0-否");
+
+		Map<String, String> syDataAuthMap = new HashMap<>(8);
+		COLUMN_INFO_MAP.put("sy_data_auth", syDataAuthMap);
+		syUserRoleMap.put("id", "主键");
+		syUserRoleMap.put("user_id", "用户id");
+		syUserRoleMap.put("dept_id", "所属的组织机构id");
+		syUserRoleMap.put("belong_dept_id", "所属的部门id");
+		syUserRoleMap.put("is_main_dept", "是否主部门，1-是，0-否");
 	}
 
 	@Override
@@ -265,6 +279,7 @@ public class McDatasourceServiceImpl implements McDatasourceService {
 			mcTableNames.add("sy_user");
 			mcTableNames.add("sy_role");
 			mcTableNames.add("sy_user_role");
+			mcTableNames.add("sy_data_auth");
 			return mcTableNames;
 		} catch (Exception e) {
 			log.error("查找MC业务表说明失败：username={}", dbConfig.getUsername(), e);
@@ -364,6 +379,7 @@ public class McDatasourceServiceImpl implements McDatasourceService {
 			Map<String, String> result = rows.stream().collect(Collectors.toMap(e -> e.get("table_name"), e -> e.get("orm_name")));
 			result.put("sy_role", "系统角色表");
 			result.put("sy_user_role", "系统用户和角色关系表");
+			result.put("sy_data_auth", "系统用户和组织机构部门的关系表");
 			return result;
 		} catch (Exception e) {
 			log.error("查找MC业务表说明失败：DbConfig={}", config, e);

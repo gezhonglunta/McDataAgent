@@ -16,10 +16,13 @@
 - `sy_dept`是系统部门表，存储的是组织机构/部门。
 - `sy_role`是系统角色表，存储的是系统角色。
 - `sy_user_role`是系统用户角色关系表，存储的是系统用户和角色的关系。
+- `sy_data_auth`是系统用户和组织机构/部门关系表，存储的是系统用户和组织机构/部门的关系。
 - 大多数情况系统所涉及的人员信息都在`sy_user`表中，除非有明确的语义指向了其它的表。
-- 组织机构-部门是树形结构，部门隶属于组织机构或部门，组织机构只能隶属于组织机构。
-- 业务表通过`create_user`、`edit_user`字段关联`sy_user`.`id`，分别代表创建者和修改者。
-- 业务表通过`data_auth`、`dept_id`字段关联`sy_dept`.`id`，分别代表组织机构和部门。
+- 组织机构-部门是树形结构，通过`id`-`up_id`进行上下级关联，部门隶属于组织机构或部门，组织机构只能隶属于组织机构。
+- 业务表通过`create_user`、`edit_user`字段关联`sy_user`.`id`，分别代表该记录的创建者和修改者。
+- 业务表通过`data_auth`、`dept_id`字段关联`sy_dept`.`id`，分别代表该记录创建者当时使用的组织机构和部门。
+- `sy_user_role`.`user_id`关联`sy_user`.`id`，`sy_user_role`.`role_id`关联`sy_role`.`id`。
+- `sy_data_auth`.`user_id`关联`sy_user`.`id`，`sy_data_auth`.`dept_id`关联`sy_dept`.`id`且`sy_dept`.`is_auth`='1'，`sy_data_auth`.`belong_dept_id`关联`sy_dept`.`id`且`sy_dept`.`is_auth`='0'
 
 ### 其它业务知
 {evidence}
