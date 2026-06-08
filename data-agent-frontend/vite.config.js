@@ -20,6 +20,7 @@ import { resolve } from 'path';
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
   const frontBase = env.VITE_FRONT_BASE || '/';
+  const backendTarget = env.VITE_BACKEND_TARGET || 'http://localhost:8065';
   return {
     base: frontBase,
     plugins: [vue()],
@@ -32,15 +33,15 @@ export default defineConfig(({ mode }) => {
       port: 3000,
       proxy: {
         '/api': {
-          target: 'http://localhost:8065',
+          target: backendTarget,
           changeOrigin: true,
         },
         '/nl2sql': {
-          target: 'http://localhost:8065',
+          target: backendTarget,
           changeOrigin: true,
         },
         '/uploads': {
-          target: 'http://localhost:8065',
+          target: backendTarget,
           changeOrigin: true,
         },
       },
