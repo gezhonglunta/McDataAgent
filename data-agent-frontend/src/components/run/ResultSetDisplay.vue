@@ -160,6 +160,7 @@
     <div class="agent-response-title result-set-header-bar">
       <div class="agent-response-title">
         {{ resultData.displayStyle?.title || '查询结果' }}
+        <span style="float: right">收起</span>
       </div>
       <div v-if="showChart" class="buttons-bar">
         <div class="chart-select-container">

@@ -187,7 +187,7 @@
     },
     setup(props) {
       const sessions = ref<ExtendedChatSession[]>([]);
-      const collapsed = ref(false);
+      const collapsed = ref(true);
       const sessionEventConnection = ref<SseConnection | null>(null);
       let reconnectTimer: number | null = null;
       let isComponentActive = true;

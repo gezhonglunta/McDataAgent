@@ -145,10 +145,21 @@
                       nodeBlock[0].nodeName === 'ReportGeneratorNode' &&
                       nodeBlock[0].textType === 'MARK_DOWN'
                     "
-                    class="agent-response-block"
+                    :class="
+                      !messageControlsCollapsed[nodeBlock[0].id]
+                        ? ['agent-response-block']
+                        : ['agent-response-block', 'collapse']
+                    "
                   >
-                    <div class="agent-response-title">
+                    <div
+                      class="agent-response-title"
+                      @click="
+                        messageControlsCollapsed[nodeBlock[0].id] =
+                          !messageControlsCollapsed[nodeBlock[0].id]
+                      "
+                    >
                       {{ nodeBlock[0].nodeName }}
+                      <span class="agent-response-collapse-icon">^</span>
                     </div>
                     <div class="agent-response-content">
                       <markdown-agent-container
@@ -163,10 +174,21 @@
                   <!-- 如果是 RESULT_SET 节点，使用 ResultSetDisplay 组件 -->
                   <div
                     v-else-if="nodeBlock.length > 0 && nodeBlock[0].textType === 'RESULT_SET'"
-                    class="agent-response-block"
+                    :class="
+                      !messageControlsCollapsed[nodeBlock[0].id]
+                        ? ['agent-response-block']
+                        : ['agent-response-block', 'collapse']
+                    "
                   >
-                    <div class="agent-response-title">
+                    <div
+                      class="agent-response-title"
+                      @click="
+                        messageControlsCollapsed[nodeBlock[0].id] =
+                          !messageControlsCollapsed[nodeBlock[0].id]
+                      "
+                    >
                       {{ nodeBlock[0].nodeName }}
+                      <span class="agent-response-collapse-icon">^</span>
                     </div>
                     <div class="agent-response-content">
                       <ResultSetDisplay
@@ -177,7 +199,10 @@
                     </div>
                   </div>
                   <!-- 其他节点使用原来的 HTML 渲染方式 -->
-                  <div v-else v-html="generateNodeHtml(nodeBlock)"></div>
+                  <div
+                    v-else
+                    v-html="generateNodeHtml(nodeBlock, index === nodeBlocks.length - 1)"
+                  ></div>
                 </template>
               </div>
             </div>
@@ -407,6 +432,7 @@
     interface Window {
       copyTextToClipboard: (btn: HTMLElement) => void;
       handleResultSetPagination: (btn: HTMLElement, direction: 'prev' | 'next') => void;
+      toggleMessageCollapse: (title: HTMLElement) => void;
     }
   }
 
@@ -487,6 +513,17 @@
         prevBtn.disabled = currentPage === 1;
         nextBtn.disabled = currentPage === totalPages;
       };
+
+      window.toggleMessageCollapse = title => {
+        const container = title.closest('.agent-response-block');
+        const content = container.querySelector('.agent-response-content');
+        const collapse = container.classList.contains('collapse');
+        if (collapse) {
+          container.classList.remove('collapse');
+        } else {
+          container.classList.add('collapse');
+        }
+      };
     },
     setup() {
       const route = useRoute();
@@ -518,7 +555,21 @@
       });
       const showReportFullscreen = ref(false);
       const fullscreenReportContent = ref('');
-      const inputControlsCollapsed = ref(false);
+      const inputControlsCollapsed = ref(true);
+      const messageControlsCollapsed = ref<Record<string, boolean>>({});
+
+      const updateLastNodeBlockExpanded = (blocks: GraphNodeResponse[][]) => {
+        blocks.forEach(block => {
+          if (block.length) {
+            messageControlsCollapsed.value[block[0].id] = true;
+          }
+        });
+
+        const lastBlock = blocks[blocks.length - 1];
+        if (lastBlock?.length) {
+          messageControlsCollapsed.value[lastBlock[0].id] = false;
+        }
+      };
 
       // 监听NL2SQL开关变化
       const handleNl2sqlOnlyChange = (value: boolean) => {
@@ -640,7 +691,7 @@
           // 重置报告状态
           resetReportState(sessionState, request);
 
-          const saveNodeMessage = (node: GraphNodeResponse[]): Promise<void> => {
+          const saveNodeMessage = (node: GraphNodeResponse[], isLast?: boolean): Promise<void> => {
             if (!node || !node.length) return Promise.resolve();
 
             // 特殊处理RESULT_SET节点
@@ -665,7 +716,7 @@
             }
 
             // 使用generateNodeHtml方法生成HTML代码，确保显示与保存一致
-            const nodeHtml = generateNodeHtml(node);
+            const nodeHtml = generateNodeHtml(node, isLast);
 
             const aiMessage: ChatMessage = {
               sessionId,
@@ -700,7 +751,10 @@
                 if (isNewNode) {
                   // 保存上一个节点的消息（如果有）
                   if (currentBlockIndex >= 0 && sessionState.nodeBlocks[currentBlockIndex]) {
-                    const savePromise = saveNodeMessage(sessionState.nodeBlocks[currentBlockIndex]);
+                    const savePromise = saveNodeMessage(
+                      sessionState.nodeBlocks[currentBlockIndex],
+                      currentBlockIndex === sessionState.nodeBlocks.length,
+                    );
                     pendingSavePromises.push(savePromise);
                   }
 
@@ -759,7 +813,10 @@
               } else if (response.textType === TextType.RESULT_SET) {
                 currentNodeName = 'result_set';
                 if (currentBlockIndex >= 0 && sessionState.nodeBlocks[currentBlockIndex]) {
-                  const savePromise = saveNodeMessage(sessionState.nodeBlocks[currentBlockIndex]);
+                  const savePromise = saveNodeMessage(
+                    sessionState.nodeBlocks[currentBlockIndex],
+                    currentBlockIndex === sessionState.nodeBlocks.length,
+                  );
                   pendingSavePromises.push(savePromise);
                 }
                 // 创建新的节点块
@@ -777,7 +834,10 @@
                 if (isNewNode) {
                   // 保存上一个节点的消息（如果有）
                   if (currentBlockIndex >= 0 && sessionState.nodeBlocks[currentBlockIndex]) {
-                    const savePromise = saveNodeMessage(sessionState.nodeBlocks[currentBlockIndex]);
+                    const savePromise = saveNodeMessage(
+                      sessionState.nodeBlocks[currentBlockIndex],
+                      currentBlockIndex === sessionState.nodeBlocks.length,
+                    );
                     pendingSavePromises.push(savePromise);
                   }
 
@@ -817,6 +877,8 @@
                   scrollToBottom();
                 }
               }
+
+              updateLastNodeBlockExpanded(sessionState.nodeBlocks);
             },
             async (error: Error) => {
               ElMessage.error(`流式请求失败: ${error.message}`);
@@ -892,7 +954,10 @@
                 // 其他节点，可能是错误或人类反馈模式
                 // 保存最后一个节点的消息（如果有）
                 if (currentBlockIndex >= 0 && sessionState.nodeBlocks[currentBlockIndex]) {
-                  await saveNodeMessage(sessionState.nodeBlocks[currentBlockIndex]);
+                  await saveNodeMessage(
+                    sessionState.nodeBlocks[currentBlockIndex],
+                    currentBlockIndex === sessionState.nodeBlocks.length - 1,
+                  );
                 }
 
                 // 如果是人工反馈模式，显示反馈组件
@@ -985,12 +1050,15 @@
       };
 
       // 生成节点容器的HTML代码
-      const generateNodeHtml = (node: GraphNodeResponse[]) => {
+      const generateNodeHtml = (node: GraphNodeResponse[], isLast: boolean) => {
         const content = formatNodeContent(node);
 
         return `
-        <div class="agent-response-block" style="display: block !important; width: 100% !important;">
-          <div class="agent-response-title">${node.length > 0 ? node[0].nodeName : '空节点'}</div>
+        <div class="agent-response-block${!isLast ? ' collapse' : ''}" style="display: block !important; width: 100% !important;">
+          <div class="agent-response-title" onclick="toggleMessageCollapse(this)">
+            ${node.length > 0 ? node[0].nodeName : '空节点'}
+            <span class="agent-response-collapse-icon">^</span>
+          </div>
           <div class="agent-response-content">${content}</div>
         </div>
       `;
@@ -1184,16 +1252,16 @@
             return;
           }
 
-          // 关闭 SSE 连接
+          // 关闭 EventSource 连接
           sessionState.closeStream();
           sessionState.closeStream = null;
 
           // 保存已接收的节点消息
           if (sessionState.nodeBlocks && sessionState.nodeBlocks.length > 0) {
-            const saveNodeMessage = (node: GraphNodeResponse[]): Promise<void> => {
+            const saveNodeMessage = (node: GraphNodeResponse[], isLast): Promise<void> => {
               if (!node || !node.length) return Promise.resolve();
 
-              const nodeHtml = generateNodeHtml(node);
+              const nodeHtml = generateNodeHtml(node, isLast);
 
               const aiMessage: ChatMessage = {
                 sessionId,
@@ -1208,7 +1276,9 @@
             };
 
             // 保存所有未保存的节点块
-            const savePromises = sessionState.nodeBlocks.map(block => saveNodeMessage(block));
+            const savePromises = sessionState.nodeBlocks.map((block, index) =>
+              saveNodeMessage(block, index === sessionState.nodeBlocks.length - 1),
+            );
             await Promise.all(savePromises).catch(error => {
               console.error('保存节点消息时出错:', error);
             });
@@ -1379,6 +1449,7 @@
         handlePresetQuestionClick,
         stopStreaming,
         deleteSessionState,
+        messageControlsCollapsed,
       };
     },
   });
@@ -1938,6 +2009,20 @@
 
   .result-set-message {
     width: 100%;
+  }
+
+  .agent-response-title {
+    justify-content: space-between;
+    cursor: pointer;
+  }
+  .agent-response-collapse-icon {
+    float: right;
+  }
+  .agent-response-block.collapse .agent-response-collapse-icon {
+    transform: rotate(90deg);
+  }
+  .agent-response-block.collapse .agent-response-content {
+    display: none;
   }
 
   /* 响应式设计 */
