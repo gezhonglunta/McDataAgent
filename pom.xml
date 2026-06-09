@@ -271,6 +271,10 @@
 
   <dependencies>
     <!-- 在这里可以替换vector-store -->
+    <dependency>
+      <groupId>org.springframework.ai</groupId>
+      <artifactId>spring-ai-starter-vector-store-pgvector</artifactId>
+    </dependency>
     <!-- 如果不使用默认依赖的话，需要手动配置application.yml -->
     <!-- 统一openai接入以支持多厂商-->
     <dependency>

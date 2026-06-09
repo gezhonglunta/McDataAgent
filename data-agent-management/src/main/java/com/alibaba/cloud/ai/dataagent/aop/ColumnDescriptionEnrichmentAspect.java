@@ -20,6 +20,7 @@ import com.alibaba.cloud.ai.dataagent.connector.DbQueryParameter;
 import com.alibaba.cloud.ai.dataagent.service.datasource.McDatasourceService;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.aspectj.lang.JoinPoint;
 import org.aspectj.lang.annotation.AfterReturning;
 import org.aspectj.lang.annotation.Aspect;
@@ -58,6 +59,8 @@ public class ColumnDescriptionEnrichmentAspect {
 
 		String tableName = param != null ? param.getTable() : "unknown";
 		log.debug("Enriching column descriptions for table: {}, column count: {}", tableName, columns.size());
+
+		columns.removeIf(e -> StringUtils.equalsIgnoreCase(e.getName(), "DATA_VERSION"));
 
 		for (ColumnInfoBO column : columns) {
 			String original = column.getDescription();
