@@ -30,6 +30,7 @@ create EXTENSION IF NOT EXISTS pg_stat_statements;
 ```
 
 # 历史数据迁移
+## 导出数据
 ```
-mysqldump -h190.160.13.13 -P20032 -udataAgent -pa123456. --compatible=ansi --no-create-info --no-tablespaces --skip-add-locks --skip-disable-keys --skip-set-charset --skip-comments --default-character-set=utf8mb4 saa_data_agent > D:\tmp\saa_data_standard_data.sql
+( echo SET session_replication_role = replica; & mysqldump -h190.160.13.13 -P20032 -udataAgent -pa123456. --no-create-info --no-tablespaces --compatible=ansi --skip-add-locks --skip-disable-keys --skip-set-charset --skip-comments --default-character-set=utf8mb4 --skip-extended-insert --order-by-primary saa_data_agent & echo SET session_replication_role = origin; ) > D:\tmp\data_for_pg.sql
 ```

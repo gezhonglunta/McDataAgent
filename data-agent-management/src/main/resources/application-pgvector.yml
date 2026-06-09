@@ -1,15 +1,18 @@
 spring:
-  datasource:
-    url: jdbc:postgresql://190.160.13.13:20039/dataagentdb
-    username: dataagent
-    password: a123456.
-    driver-class-name: org.postgresql.Driver
-    type: com.alibaba.druid.pool.DruidDataSource
+  vectorstore:
+    datasource:
+      url: jdbc:postgresql://190.160.13.13:20039/dataagentdb
+      username: dataagent
+      password: a123456.
+      driver-class-name: org.postgresql.Driver
+      type: com.alibaba.druid.pool.DruidDataSource
   ai:
     vectorstore:
       type: pgvector
       pgvector:
+        schema-Name: dataagent
+        initialize-schema: true
         index-type: HNSW
         distance-type: COSINE_DISTANCE
-        dimensions: 1536
+        dimensions: 2000
         max-document-batch-size: 10000
