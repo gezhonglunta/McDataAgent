@@ -26,6 +26,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpCookie;
+import org.springframework.http.ResponseCookie;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 import org.springframework.web.server.ServerWebExchange;
@@ -39,7 +40,6 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.SignatureException;
 import java.util.Base64;
-import java.util.List;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 
@@ -75,62 +75,43 @@ public class JwtAuthenticationWebFilter implements WebFilter {
 	@Value("${spring.ai.alibaba.data-agent.auth.verify-signature:true}")
 	boolean verifySignature = true;
 
+	@Value("${spring.ai.alibaba.data-agent.auth.user-context-cookie-name:data-agent-user}")
+	String userContextCookieName = "data-agent-user";
+
+	@Value("${spring.ai.alibaba.data-agent.auth.user-context-cookie-secret:}")
+	String userContextCookieSecret = "";
+
+	@Value("${spring.ai.alibaba.data-agent.auth.user-context-cookie-same-site:Lax}")
+	String userContextCookieSameSite = "Lax";
+
+	@Value("${spring.ai.alibaba.data-agent.base-path:}")
+	String basePath = "";
+
 	@Override
 	public Mono<Void> filter(ServerWebExchange exchange, WebFilterChain chain) {
 		String path = exchange.getRequest().getURI().getPath();
-		log.info("Incoming request cookies: path={}, cookies={}", path, cookieSummary(exchange.getRequest().getCookies().values().stream().toList()));
 
 		if (shouldSkipAuth(path)) {
 			return chain.filter(exchange);
 		}
 
-		String token = extractToken(exchange);
+		JwtUser user = resolveUser(exchange);
 
-		if (token == null) {
-			log.warn("JWT authentication failed: token missing, path={}", path);
+		if (user == null) {
+			log.warn("JWT authentication failed: user missing, path={}", path);
 			return unauthorized(exchange);
 		}
-		log.debug("JWT token extracted: path={}, {}", path, tokenFingerprint(token));
 
-		JwtUser user = parseJwt(token);
-
-		if (user != null) {
-			log.debug("JWT authentication succeeded: path={}, claim={}, userId={}", path, jwtClaimName,
-					maskUserId(user.getUserId()));
-			UserContextHolder.write(exchange, user);
-			return chain.filter(exchange)
-					.contextWrite(ctx -> UserContextHolder.write(ctx, user))
-					.doFinally(signal -> UserContextHolder.clear());
-		}
-
-		log.warn("JWT authentication failed: token parse returned empty user, path={}, claim={}, {}", path,
-				jwtClaimName, tokenFingerprint(token));
-		return unauthorized(exchange);
+		log.debug("JWT authentication succeeded: path={}, claim={}, userId={}", path, jwtClaimName,
+				maskUserId(user.getUserId()));
+		writeUserContextCookie(exchange, user.getUserId());
+		UserContextHolder.write(exchange, user);
+		return chain.filter(exchange).contextWrite(ctx -> UserContextHolder.write(ctx, user)).doFinally(signal -> UserContextHolder.clear());
 	}
 
 	private Mono<Void> unauthorized(ServerWebExchange exchange) {
 		exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
 		return exchange.getResponse().setComplete();
-	}
-
-	private String cookieSummary(List<List<HttpCookie>> cookieGroups) {
-		if (cookieGroups == null || cookieGroups.isEmpty()) {
-			return "[]";
-		}
-		StringBuilder builder = new StringBuilder("[");
-		boolean first = true;
-		for (List<HttpCookie> cookies : cookieGroups) {
-			for (HttpCookie cookie : cookies) {
-				if (!first) {
-					builder.append(", ");
-				}
-				builder.append(cookie.getName())
-					.append("=")
-					.append(cookie.getValue());
-				first = false;
-			}
-		}
-		return builder.append("]").toString();
 	}
 
 	static boolean shouldSkipAuth(String path) {
@@ -156,12 +137,48 @@ public class JwtAuthenticationWebFilter implements WebFilter {
 		return false;
 	}
 
+	JwtUser resolveUser(ServerWebExchange exchange) {
+		String headerToken = extractHeaderToken(exchange);
+		if (headerToken != null) {
+			log.debug("JWT token source: Authorization header");
+			log.debug("JWT token extracted: path={}, {}", exchange.getRequest().getURI().getPath(), tokenFingerprint(headerToken));
+			JwtUser jwtUser = parseJwt(headerToken);
+			if (jwtUser != null) {
+				return jwtUser;
+			}
+		}
+
+		JwtUser cookieUser = extractUserFromContextCookie(exchange);
+		if (cookieUser != null) {
+			log.debug("JWT token source: user context cookie, userId={}", maskUserId(cookieUser.getUserId()));
+			return cookieUser;
+		}
+
+		String fallbackToken = extractCookieOrParameterToken(exchange);
+		if (fallbackToken != null) {
+			log.debug("JWT token extracted: path={}, {}", exchange.getRequest().getURI().getPath(), tokenFingerprint(fallbackToken));
+			return parseJwt(fallbackToken);
+		}
+		return null;
+	}
+
 	String extractToken(ServerWebExchange exchange) {
+		String headerToken = extractHeaderToken(exchange);
+		if (headerToken != null) {
+			return headerToken;
+		}
+		return extractCookieOrParameterToken(exchange);
+	}
+
+	String extractHeaderToken(ServerWebExchange exchange) {
 		String authHeader = exchange.getRequest().getHeaders().getFirst(tokenHeaderName);
 		if (org.springframework.util.StringUtils.hasText(authHeader) && authHeader.startsWith(tokenPrefix)) {
-			log.debug("JWT token source: Authorization header");
 			return authHeader.substring(tokenPrefix.length());
 		}
+		return null;
+	}
+
+	String extractCookieOrParameterToken(ServerWebExchange exchange) {
 		HttpCookie cookie = exchange.getRequest().getCookies().getFirst(tokenCookieName);
 		if (cookie != null) {
 			log.debug("JWT token source: Bearer cookie");
@@ -175,6 +192,20 @@ public class JwtAuthenticationWebFilter implements WebFilter {
 			}
 		}
 		return null;
+	}
+
+	JwtUser extractUserFromContextCookie(ServerWebExchange exchange) {
+		HttpCookie cookie = exchange.getRequest().getCookies().getFirst(userContextCookieName);
+		if (cookie == null || !org.springframework.util.StringUtils.hasText(cookie.getValue())) {
+			return null;
+		}
+		String userId = parseSignedUserContext(cookie.getValue());
+		if (!org.springframework.util.StringUtils.hasText(userId)) {
+			log.warn("Invalid user context cookie: name={}, path={}", userContextCookieName,
+					exchange.getRequest().getURI().getPath());
+			return null;
+		}
+		return new JwtUser(userId);
 	}
 
 	JwtUser parseJwt(String token) {
@@ -204,6 +235,92 @@ public class JwtAuthenticationWebFilter implements WebFilter {
 			log.warn("Failed to parse JWT: {}, {}", e.getMessage(), tokenFingerprint(token));
 		}
 		return null;
+	}
+
+	void writeUserContextCookie(ServerWebExchange exchange, String userId) {
+		String signedValue = createSignedUserContext(userId);
+		if (!org.springframework.util.StringUtils.hasText(signedValue)) {
+			log.warn("Skip writing user context cookie because secret is unavailable: cookieName={}", userContextCookieName);
+			return;
+		}
+		ResponseCookie cookie = ResponseCookie.from(userContextCookieName, signedValue)
+			.httpOnly(true)
+			.secure("https".equalsIgnoreCase(exchange.getRequest().getURI().getScheme()))
+			.sameSite(userContextCookieSameSite)
+			.path(resolveCookiePath())
+			.build();
+		exchange.getResponse().addCookie(cookie);
+	}
+
+	String createSignedUserContext(String userId) {
+		if (!org.springframework.util.StringUtils.hasText(userId)) {
+			return null;
+		}
+		byte[] secret = decodeCookieSecret();
+		if (secret == null) {
+			return null;
+		}
+		String payload = Base64.getUrlEncoder().withoutPadding().encodeToString(userId.getBytes(StandardCharsets.UTF_8));
+		String signature = hmacSha256(payload, secret);
+		return payload + "." + signature;
+	}
+
+	String parseSignedUserContext(String cookieValue) {
+		if (!org.springframework.util.StringUtils.hasText(cookieValue)) {
+			return null;
+		}
+		String[] parts = cookieValue.split("\\.");
+		if (parts.length != 2) {
+			return null;
+		}
+		byte[] secret = decodeCookieSecret();
+		if (secret == null) {
+			return null;
+		}
+		String expectedSignature = hmacSha256(parts[0], secret);
+		if (!MessageDigest.isEqual(expectedSignature.getBytes(StandardCharsets.UTF_8),
+				parts[1].getBytes(StandardCharsets.UTF_8))) {
+			return null;
+		}
+		try {
+			return new String(Base64.getUrlDecoder().decode(parts[0]), StandardCharsets.UTF_8);
+		}
+		catch (IllegalArgumentException ex) {
+			return null;
+		}
+	}
+
+	private byte[] decodeCookieSecret() {
+		if (!org.springframework.util.StringUtils.hasText(userContextCookieSecret)) {
+			return null;
+		}
+		try {
+			return Base64.getDecoder().decode(userContextCookieSecret);
+		}
+		catch (IllegalArgumentException ex) {
+			log.warn("User context cookie secret is not valid base64");
+			return null;
+		}
+	}
+
+	private String hmacSha256(String value, byte[] secret) {
+		try {
+			Mac mac = Mac.getInstance("HmacSHA256");
+			mac.init(new SecretKeySpec(secret, "HmacSHA256"));
+			return Base64.getUrlEncoder()
+				.withoutPadding()
+				.encodeToString(mac.doFinal(value.getBytes(StandardCharsets.UTF_8)));
+		}
+		catch (Exception ex) {
+			throw new IllegalStateException("Failed to sign user context cookie", ex);
+		}
+	}
+
+	private String resolveCookiePath() {
+		if (!org.springframework.util.StringUtils.hasText(basePath) || "/".equals(basePath)) {
+			return "/";
+		}
+		return basePath.startsWith("/") ? basePath : "/" + basePath;
 	}
 
 	private void verifySignature(String[] parts, String token) throws SignatureException {

@@ -127,7 +127,7 @@
   import { useRouter, useRoute } from 'vue-router';
   import { ElMessage, ElMessageBox } from 'element-plus';
   import ChatService from '../../services/chat';
-  import { connectSse, type SseConnection } from '../../services/sse';
+  import { apiUrl } from '../../services/common';
   import {
     Plus,
     Delete,
@@ -188,7 +188,7 @@
     setup(props) {
       const sessions = ref<ExtendedChatSession[]>([]);
       const collapsed = ref(true);
-      const sessionEventConnection = ref<SseConnection | null>(null);
+      const sessionEventConnection = ref<EventSource | null>(null);
       let reconnectTimer: number | null = null;
       let isComponentActive = true;
 
@@ -241,32 +241,23 @@
           sessionEventConnection.value.close();
           sessionEventConnection.value = null;
         }
-        const connection = connectSse(`/api/agent/${currentAgentId}/sessions/stream`, {
-          onEvent: async event => {
-            if (event.event !== 'title-updated') {
-              return;
-            }
-            try {
-              const data = JSON.parse(event.data) as SessionUpdateEvent;
-              handleTitleUpdate(data);
-            } catch (error) {
-              console.error('解析会话标题更新失败', error);
-            }
-          },
-          onError: async error => {
-            console.error('会话推送连接异常:', error);
-            if (sessionEventConnection.value === connection) {
-              sessionEventConnection.value = null;
-            }
-            scheduleReconnect();
-          },
-          onClose: async () => {
-            if (sessionEventConnection.value === connection) {
-              sessionEventConnection.value = null;
-            }
-            scheduleReconnect();
-          },
+        const connection = new EventSource(apiUrl(`/api/agent/${currentAgentId}/sessions/stream`));
+        connection.addEventListener('title-updated', event => {
+          try {
+            const data = JSON.parse((event as MessageEvent).data) as SessionUpdateEvent;
+            handleTitleUpdate(data);
+          } catch (error) {
+            console.error('解析会话标题更新失败', error);
+          }
         });
+        connection.onerror = () => {
+          console.error('会话推送连接异常');
+          connection.close();
+          if (sessionEventConnection.value === connection) {
+            sessionEventConnection.value = null;
+          }
+          scheduleReconnect();
+        };
         sessionEventConnection.value = connection;
       };
 

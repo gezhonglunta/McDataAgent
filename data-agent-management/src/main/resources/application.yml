@@ -63,6 +63,9 @@ spring:
           token-cookie-name: ${DATA_AGENT_TOKEN_COOKIE_NAME:Bearer}
           token-parameter-name: ${DATA_AGENT_TOKEN_PARAMETER_NAME:}
           verify-signature: ${DATA_AGENT_JWT_VERIFY_SIGNATURE:true}
+          user-context-cookie-name: ${DATA_AGENT_USER_CONTEXT_COOKIE_NAME:data-agent-user}
+          user-context-cookie-secret: ${DATA_AGENT_USER_CONTEXT_COOKIE_SECRET:${DATA_AGENT_JWT_SECRET:}}
+          user-context-cookie-same-site: ${DATA_AGENT_USER_CONTEXT_COOKIE_SAME_SITE:Lax}
         base-path: ${DATA_AGENT_BASE_PATH:}
         # Langfuse 可观测性配置
         langfuse:

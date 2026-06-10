@@ -17,6 +17,7 @@ package com.alibaba.cloud.ai.dataagent.filter;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpCookie;
+import org.springframework.http.ResponseCookie;
 import org.springframework.mock.http.server.reactive.MockServerHttpRequest;
 import org.springframework.mock.web.server.MockServerWebExchange;
 
@@ -90,6 +91,69 @@ class JwtAuthenticationWebFilterTest {
 		assertThat(filter.extractToken(headerExchange)).isEqualTo("header-token");
 		assertThat(filter.extractToken(cookieExchange)).isEqualTo("cookie-token");
 		assertThat(filter.extractToken(parameterExchange)).isEqualTo("parameter-token");
+	}
+
+	@Test
+	void resolveUserPrefersAuthorizationHeaderOverContextCookie() {
+		String secret = Base64.getEncoder()
+			.encodeToString("12345678901234567890123456789012".getBytes(StandardCharsets.UTF_8));
+		String token = signedHs256Token("{\"alg\":\"HS256\",\"typ\":\"JWT\"}", "{\"sub\":\"header-user\"}", secret);
+		JwtAuthenticationWebFilter filter = new JwtAuthenticationWebFilter();
+		filter.jwtSecret = secret;
+		filter.userContextCookieSecret = secret;
+		String signedCookie = filter.createSignedUserContext("cookie-user");
+
+		MockServerWebExchange exchange = MockServerWebExchange.from(MockServerHttpRequest.get("/api/test")
+			.header("Authorization", "Bearer " + token)
+			.cookie(new HttpCookie("data-agent-user", signedCookie)));
+
+		assertThat(filter.resolveUser(exchange).getUserId()).isEqualTo("header-user");
+	}
+
+	@Test
+	void resolveUserSupportsSignedContextCookie() {
+		String secret = Base64.getEncoder()
+			.encodeToString("12345678901234567890123456789012".getBytes(StandardCharsets.UTF_8));
+		JwtAuthenticationWebFilter filter = new JwtAuthenticationWebFilter();
+		filter.userContextCookieSecret = secret;
+		String signedCookie = filter.createSignedUserContext("cookie-user");
+
+		MockServerWebExchange exchange = MockServerWebExchange
+			.from(MockServerHttpRequest.get("/api/test").cookie(new HttpCookie("data-agent-user", signedCookie)));
+
+		assertThat(filter.resolveUser(exchange).getUserId()).isEqualTo("cookie-user");
+	}
+
+	@Test
+	void resolveUserRejectsUnsignedContextCookie() {
+		String secret = Base64.getEncoder()
+			.encodeToString("12345678901234567890123456789012".getBytes(StandardCharsets.UTF_8));
+		JwtAuthenticationWebFilter filter = new JwtAuthenticationWebFilter();
+		filter.userContextCookieSecret = secret;
+
+		MockServerWebExchange exchange = MockServerWebExchange
+			.from(MockServerHttpRequest.get("/api/test").cookie(new HttpCookie("data-agent-user", "plain-user-id")));
+
+		assertThat(filter.resolveUser(exchange)).isNull();
+	}
+
+	@Test
+	void writeUserContextCookieUsesConfiguredBasePath() {
+		String secret = Base64.getEncoder()
+			.encodeToString("12345678901234567890123456789012".getBytes(StandardCharsets.UTF_8));
+		JwtAuthenticationWebFilter filter = new JwtAuthenticationWebFilter();
+		filter.userContextCookieSecret = secret;
+		filter.basePath = "/nl2sql";
+
+		MockServerWebExchange exchange = MockServerWebExchange.from(MockServerHttpRequest.get("https://example.com/api/test"));
+		filter.writeUserContextCookie(exchange, "cookie-user");
+
+		ResponseCookie cookie = exchange.getResponse().getCookies().getFirst("data-agent-user");
+		assertThat(cookie).isNotNull();
+		assertThat(cookie.isHttpOnly()).isTrue();
+		assertThat(cookie.isSecure()).isTrue();
+		assertThat(cookie.getPath()).isEqualTo("/nl2sql");
+		assertThat(filter.parseSignedUserContext(cookie.getValue())).isEqualTo("cookie-user");
 	}
 
 	@Test

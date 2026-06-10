@@ -25,7 +25,10 @@
 ```
 请求 → Spring Cloud Gateway (JWT验签/转发)
      → /nl2sql/ 前缀转发到本系统（可保留前缀，也可剥离前缀）
-     → JwtAuthenticationWebFilter (解析JWT, 提取userId)
+     → JwtAuthenticationWebFilter
+        → 普通 API：解析 Authorization 中的 JWT，提取 userId
+        → 响应成功后：回写签名的 user context cookie
+        → 原生 SSE：浏览器自动携带 user context cookie，Filter 还原 userId
      → Reactor Context 存储 JwtUser
      → Controller 通过 UserContextHolder 获取用户信息
      → Service 层按 userId 过滤数据
@@ -39,21 +42,28 @@
 |---|---|---|
 | `JwtUser` | `dto/` | 用户信息 DTO，包含 `userId(String)` |
 | `UserContextHolder` | `util/` | 用户信息存取工具，提供 `Mono<JwtUser> getCurrentUser()`（Reactor Context）和 `String getCurrentUserId()`（ThreadLocal 兜底） |
-| `JwtAuthenticationWebFilter` | `filter/` | WebFilter，解析 JWT header，将 JwtUser 同时写入 Reactor Context 和 ThreadLocal |
+| `JwtAuthenticationWebFilter` | `filter/` | WebFilter，优先解析 `Authorization` 中的 JWT，并支持从签名的 user context cookie 恢复用户，将 JwtUser 同时写入 Reactor Context 和 ThreadLocal |
 | `SpaWebFilter` | `filter/` | SPA History 模式 fallback，前端路由返回 index.html |
 
 ### JwtAuthenticationWebFilter 逻辑
 
 ```
-请求进入 → 按 header → cookie → request parameter 顺序提取 token
+请求进入 → 按 Authorization header → user context cookie → token cookie/query parameter 顺序解析用户
   → 若是前端入口、静态资源或前端 History 路由（如 /front/model-config）→ 直接放行
-  → 有 token → 按配置进行 HS256 + base64Secret 验签（默认开启）
+  → Authorization 存在 → 按配置进行 HS256 + base64Secret 验签（默认开启）
     → 解析 payload claims → 提取 jwt-claim-name 字段作为 userId → 构建 JwtUser
-  → 无 token / 验签失败 / claim 缺失 → 返回 401
+    → 向响应写入签名的 user context cookie（HttpOnly）
+  → Authorization 不存在 → 尝试解析签名的 user context cookie → 成功则构建 JwtUser
+  → 若仍无用户 → 再尝试兼容旧 token cookie / request parameter
+  → 无可用身份 / 验签失败 / claim 缺失 → 返回 401
   → 将 JwtUser 同时写入 Reactor Context 和 ThreadLocal
   → 继续 filter chain
   → 请求结束时清理 ThreadLocal（防止线程池复用导致数据泄漏）
 ```
+
+**SSE 回退策略**：前端分析流和会话推送改回原生 `EventSource`。由于浏览器原生 `EventSource` 不支持自定义 `Authorization` 请求头，普通 API 请求仍由前端从网关 cookie 中读取 token 并显式补充 `Authorization`；SSE 请求则依赖浏览器自动携带的 user context cookie，由 `JwtAuthenticationWebFilter` 在服务端恢复 `userId`。
+
+**user context cookie 约束**：cookie 中不能直接存放裸 `userId` 作为可信身份来源，必须由服务端使用密钥签名后写入，例如 `base64url(userId) + "." + hmac`。Filter 仅在签名校验通过时才接受该 cookie，避免客户端伪造任意 `userId` 冒充其他用户。
 
 **ThreadLocal 生命周期**：Filter 在请求开始时设置 ThreadLocal，在 `doFinally` 中清理，确保线程池场景下不会泄漏。
 
@@ -77,6 +87,9 @@ spring.ai.alibaba.data-agent:
     token-cookie-name: Bearer
     token-parameter-name: ""
     verify-signature: true
+    user-context-cookie-name: data-agent-user
+    user-context-cookie-secret: ""   # 默认可复用 jwt-secret
+    user-context-cookie-same-site: Lax
   base-path: ""             # URL 前缀，空字符串表示无前缀
 ```
 
@@ -215,6 +228,7 @@ public ResponseEntity<List<ChatSession>> getAgentSessions(@PathVariable Integer 
 - Sink key 从 `agentId` 改为 `agentId + ":" + userId`
 - 无用户模式下 key 为 `agentId + ":"`（空字符串），保持兼容
 - 注册/注销/推送均按 `agentId + userId` 维度操作
+- `SessionEventController` 通过 `UserContextHolder.getCurrentUserId(exchange)` 获取当前用户，来源可以是 `Authorization` 解析结果，也可以是原生 SSE 自动携带的签名 user context cookie
 
 ### 向后兼容策略
 
@@ -313,7 +327,8 @@ axios.interceptors.request.use(config => {
 
 - 仅普通 API 请求需要补充 `Authorization` 头
 - 前端页面路由访问不需要携带该 header
-- SSE 推送相关请求本次暂不处理 `Authorization` 透传问题，后续如有需要再单独设计
+- SSE 请求改回原生 `EventSource`，不再尝试在前端透传 `Authorization`
+- SSE 所需用户身份由后端写入并校验签名 user context cookie，浏览器会自动随原生 `EventSource` 请求携带该 cookie
 
 ### 模型配置检查与 401 处理
 
