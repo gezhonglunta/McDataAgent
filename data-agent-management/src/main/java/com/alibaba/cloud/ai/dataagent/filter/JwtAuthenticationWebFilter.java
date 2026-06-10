@@ -20,6 +20,7 @@ import com.alibaba.cloud.ai.dataagent.util.UserContextHolder;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.core.Ordered;
@@ -27,7 +28,6 @@ import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpCookie;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
-import org.springframework.util.StringUtils;
 import org.springframework.web.server.ServerWebExchange;
 import org.springframework.web.server.WebFilter;
 import org.springframework.web.server.WebFilterChain;
@@ -97,8 +97,8 @@ public class JwtAuthenticationWebFilter implements WebFilter {
 					maskUserId(user.getUserId()));
 			UserContextHolder.write(exchange, user);
 			return chain.filter(exchange)
-				.contextWrite(ctx -> UserContextHolder.write(ctx, user))
-				.doFinally(signal -> UserContextHolder.clear());
+					.contextWrite(ctx -> UserContextHolder.write(ctx, user))
+					.doFinally(signal -> UserContextHolder.clear());
 		}
 
 		log.warn("JWT authentication failed: token parse returned empty user, path={}, claim={}, {}", path,
@@ -113,6 +113,9 @@ public class JwtAuthenticationWebFilter implements WebFilter {
 
 	static boolean shouldSkipAuth(String path) {
 		if (path == null) {
+			return false;
+		}
+		if (StringUtils.contains(path, "/api/test/")) {
 			return false;
 		}
 		if ("/".equals(path) || "/index.html".equals(path)) {
@@ -133,7 +136,7 @@ public class JwtAuthenticationWebFilter implements WebFilter {
 
 	String extractToken(ServerWebExchange exchange) {
 		String authHeader = exchange.getRequest().getHeaders().getFirst(tokenHeaderName);
-		if (StringUtils.hasText(authHeader) && authHeader.startsWith(tokenPrefix)) {
+		if (org.springframework.util.StringUtils.hasText(authHeader) && authHeader.startsWith(tokenPrefix)) {
 			log.debug("JWT token source: Authorization header");
 			return authHeader.substring(tokenPrefix.length());
 		}
@@ -142,9 +145,9 @@ public class JwtAuthenticationWebFilter implements WebFilter {
 			log.debug("JWT token source: Bearer cookie");
 			return cookie.getValue();
 		}
-		if (StringUtils.hasText(tokenParameterName)) {
+		if (org.springframework.util.StringUtils.hasText(tokenParameterName)) {
 			String parameterToken = exchange.getRequest().getQueryParams().getFirst(tokenParameterName);
-			if (StringUtils.hasText(parameterToken)) {
+			if (org.springframework.util.StringUtils.hasText(parameterToken)) {
 				log.debug("JWT token source: request parameter {}", tokenParameterName);
 				return parameterToken;
 			}
@@ -175,8 +178,7 @@ public class JwtAuthenticationWebFilter implements WebFilter {
 				return new JwtUser(userId);
 			}
 			log.warn("JWT parse step: claim missing or empty, claim={}, {}", jwtClaimName, tokenFingerprint(token));
-		}
-		catch (Exception e) {
+		} catch (Exception e) {
 			log.warn("Failed to parse JWT: {}, {}", e.getMessage(), tokenFingerprint(token));
 		}
 		return null;
@@ -186,7 +188,7 @@ public class JwtAuthenticationWebFilter implements WebFilter {
 		if (!"HS256".equalsIgnoreCase(signatureAlgorithm)) {
 			throw new SignatureException("Unsupported JWT signature algorithm: " + signatureAlgorithm);
 		}
-		if (!StringUtils.hasText(jwtSecret)) {
+		if (!org.springframework.util.StringUtils.hasText(jwtSecret)) {
 			throw new SignatureException("JWT secret is empty");
 		}
 		try {
@@ -194,22 +196,19 @@ public class JwtAuthenticationWebFilter implements WebFilter {
 			mac.init(new SecretKeySpec(Base64.getDecoder().decode(jwtSecret), "HmacSHA256"));
 			String content = parts[0] + "." + parts[1];
 			String expected = Base64.getUrlEncoder()
-				.withoutPadding()
-				.encodeToString(mac.doFinal(content.getBytes(StandardCharsets.UTF_8)));
+					.withoutPadding()
+					.encodeToString(mac.doFinal(content.getBytes(StandardCharsets.UTF_8)));
 			if (!MessageDigest.isEqual(expected.getBytes(StandardCharsets.UTF_8),
 					parts[2].getBytes(StandardCharsets.UTF_8))) {
 				throw new SignatureException("JWT signature validation failed");
 			}
 			log.debug("JWT parse step: signature verified, algorithm={}, {}", signatureAlgorithm,
 					tokenFingerprint(token));
-		}
-		catch (IllegalArgumentException ex) {
+		} catch (IllegalArgumentException ex) {
 			throw new SignatureException("JWT secret is not valid base64", ex);
-		}
-		catch (SignatureException ex) {
+		} catch (SignatureException ex) {
 			throw ex;
-		}
-		catch (Exception ex) {
+		} catch (Exception ex) {
 			throw new SignatureException("JWT signature validation failed: " + ex.getMessage(), ex);
 		}
 	}
@@ -237,8 +236,7 @@ public class JwtAuthenticationWebFilter implements WebFilter {
 				builder.append(String.format("%02x", b));
 			}
 			return builder.toString();
-		}
-		catch (NoSuchAlgorithmException ex) {
+		} catch (NoSuchAlgorithmException ex) {
 			throw new IllegalStateException("SHA-256 is not available", ex);
 		}
 	}

@@ -10,9 +10,11 @@ spring:
     vectorstore:
       type: pgvector
       pgvector:
-        schema-Name: dataagent
+        schema-name: dataagent
+        table-name: vector_store
+        schema-validation: false
         initialize-schema: true
         index-type: HNSW
         distance-type: COSINE_DISTANCE
-        dimensions: 2000
+        dimensions: 1024
         max-document-batch-size: 10000
