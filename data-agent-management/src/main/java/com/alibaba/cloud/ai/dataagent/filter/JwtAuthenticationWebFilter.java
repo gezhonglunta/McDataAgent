@@ -39,6 +39,7 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.SignatureException;
 import java.util.Base64;
+import java.util.List;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 
@@ -77,6 +78,7 @@ public class JwtAuthenticationWebFilter implements WebFilter {
 	@Override
 	public Mono<Void> filter(ServerWebExchange exchange, WebFilterChain chain) {
 		String path = exchange.getRequest().getURI().getPath();
+		log.info("Incoming request cookies: path={}, cookies={}", path, cookieSummary(exchange.getRequest().getCookies().values().stream().toList()));
 
 		if (shouldSkipAuth(path)) {
 			return chain.filter(exchange);
@@ -109,6 +111,26 @@ public class JwtAuthenticationWebFilter implements WebFilter {
 	private Mono<Void> unauthorized(ServerWebExchange exchange) {
 		exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
 		return exchange.getResponse().setComplete();
+	}
+
+	private String cookieSummary(List<List<HttpCookie>> cookieGroups) {
+		if (cookieGroups == null || cookieGroups.isEmpty()) {
+			return "[]";
+		}
+		StringBuilder builder = new StringBuilder("[");
+		boolean first = true;
+		for (List<HttpCookie> cookies : cookieGroups) {
+			for (HttpCookie cookie : cookies) {
+				if (!first) {
+					builder.append(", ");
+				}
+				builder.append(cookie.getName())
+					.append("=")
+					.append(cookie.getValue());
+				first = false;
+			}
+		}
+		return builder.append("]").toString();
 	}
 
 	static boolean shouldSkipAuth(String path) {
