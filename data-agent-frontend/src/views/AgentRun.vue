@@ -16,7 +16,9 @@
 
 <template>
   <BaseLayout>
-    <el-container style="height: calc(100vh - 60px); gap: 0">
+    <el-container
+      :style="hideHeader ? 'height: 100vh; gap: 0' : 'height: calc(100vh - 60px); gap: 0'"
+    >
       <!-- 左侧历史消息栏 -->
       <ChatSessionSidebar
         :agent="agent"
@@ -527,6 +529,8 @@
     },
     setup() {
       const route = useRoute();
+
+      const hideHeader = computed(() => route.meta?.hideHeader === true);
 
       // 响应式数据
       const agent = ref<Agent>({} as Agent);
@@ -1450,6 +1454,7 @@
         stopStreaming,
         deleteSessionState,
         messageControlsCollapsed,
+        hideHeader,
       };
     },
   });
