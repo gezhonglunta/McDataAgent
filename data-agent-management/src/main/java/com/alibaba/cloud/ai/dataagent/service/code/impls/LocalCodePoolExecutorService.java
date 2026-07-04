@@ -17,23 +17,23 @@ package com.alibaba.cloud.ai.dataagent.service.code.impls;
 
 import com.alibaba.cloud.ai.dataagent.properties.CodeExecutorProperties;
 import com.alibaba.cloud.ai.dataagent.service.code.CodePoolExecutorService;
+import com.alibaba.cloud.ai.dataagent.service.code.local.ExecutableProgramLocator;
+import com.alibaba.cloud.ai.dataagent.service.code.local.ExecutionTimeoutParser;
+import com.alibaba.cloud.ai.dataagent.service.code.local.PathExecutableProgramLocator;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.util.StringUtils;
 
 import java.io.BufferedReader;
-import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.StringWriter;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
+import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 /**
  * 使用本地Python3环境运行代码的实现类，要求本地的Python3需要有pandas等数据分析库。
@@ -46,18 +46,33 @@ public class LocalCodePoolExecutorService extends AbstractCodePoolExecutorServic
 
 	private final ConcurrentHashMap<String, Path> containers;
 
-	private static final String[] pythonNames = new String[] { "python3", "pypy3", "py3", "python", "pypy", "py" };
+	private static final List<String> PYTHON_NAMES = List.of("python3", "pypy3", "py3", "python", "pypy", "py");
 
-	private static final String[] pipNames = new String[] { "pip3", "pip" };
+	private static final List<String> PIP_NAMES = List.of("pip3", "pip");
+
+	private final String pythonExecutable;
+
+	private final String pipExecutable;
+
+	private final ExecutionTimeoutParser timeoutParser;
 
 	// 对于本地运行这个实现类，“容器”为临时文件夹
 	public LocalCodePoolExecutorService(CodeExecutorProperties properties) {
+		this(properties, new PathExecutableProgramLocator(), new ExecutionTimeoutParser());
+	}
+
+	LocalCodePoolExecutorService(CodeExecutorProperties properties, ExecutableProgramLocator programLocator,
+			ExecutionTimeoutParser timeoutParser) {
+		this(properties, timeoutParser, locatePrograms(programLocator));
+	}
+
+	private LocalCodePoolExecutorService(CodeExecutorProperties properties, ExecutionTimeoutParser timeoutParser,
+			LocalPrograms programs) {
 		super(properties);
 		this.containers = new ConcurrentHashMap<>();
-		if (this.checkProgramExists(pythonNames) == null) {
-			throw new IllegalStateException(
-					"No valid Python interpreter was found for the current system environment variables. Please install Python3 into the system environment variables first.");
-		}
+		this.pythonExecutable = programs.pythonExecutable();
+		this.pipExecutable = programs.pipExecutable();
+		this.timeoutParser = timeoutParser;
 	}
 
 	@Override
@@ -87,9 +102,11 @@ public class LocalCodePoolExecutorService extends AbstractCodePoolExecutorServic
 		}
 
 		// 如果有requirements，则先安装依赖
-		if (this.checkProgramExists(pipNames) != null && StringUtils.hasText(request.requirement())) {
-			ProcessBuilder pip = new ProcessBuilder(this.checkProgramExists(pipNames), "install", "--no-cache-dir",
-					"-r", requirementFile.toAbsolutePath().toString(), ">", "/dev/null");
+		if (this.pipExecutable != null && StringUtils.hasText(request.requirement())) {
+			ProcessBuilder pip = new ProcessBuilder(this.pipExecutable, "install", "--no-cache-dir", "-r",
+					requirementFile.toAbsolutePath().toString());
+			pip.redirectOutput(ProcessBuilder.Redirect.DISCARD);
+			pip.redirectError(ProcessBuilder.Redirect.DISCARD);
 			Process process = null;
 
 			try {
@@ -117,8 +134,7 @@ public class LocalCodePoolExecutorService extends AbstractCodePoolExecutorServic
 		// 运行Python代码
 		Process process = null;
 		try {
-			ProcessBuilder pb = new ProcessBuilder(this.checkProgramExists(pythonNames),
-					scriptFile.toAbsolutePath().toString());
+			ProcessBuilder pb = new ProcessBuilder(this.pythonExecutable, scriptFile.toAbsolutePath().toString());
 			pb.directory(container.toFile());
 			pb.redirectInput(stdinFile.toFile());
 			process = pb.start();
@@ -146,7 +162,7 @@ public class LocalCodePoolExecutorService extends AbstractCodePoolExecutorServic
 				});
 
 				// 等待进程完成，带超时限制
-				boolean completed = process.waitFor(this.parseToMilliseconds(this.properties.getCodeTimeout()),
+				boolean completed = process.waitFor(this.timeoutParser.parse(this.properties.getCodeTimeout()),
 						TimeUnit.MILLISECONDS);
 				if (!completed) {
 					process.destroy();
@@ -194,67 +210,15 @@ public class LocalCodePoolExecutorService extends AbstractCodePoolExecutorServic
 		this.clearTempDir(container);
 	}
 
-	/**
-	 * 按顺序检查多个程序是否存在
-	 * @param programNames 程序名称，按优先级顺序
-	 * @return 第一个找到的程序名称，如果都没找到返回null
-	 */
-	private String checkProgramExists(String... programNames) {
-		if (programNames == null)
-			return null;
-
-		String pathEnv = System.getenv("PATH");
-		if (pathEnv == null)
-			return null;
-
-		String[] pathDirs = pathEnv.split(File.pathSeparator);
-		boolean isWindows = System.getProperty("os.name").toLowerCase().contains("win");
-
-		for (String program : programNames) {
-			for (String dir : pathDirs) {
-				if (dir == null || dir.trim().isEmpty())
-					continue;
-
-				// 检查原始程序名
-				Path path = Paths.get(dir, program);
-				if (Files.exists(path) && Files.isExecutable(path)) {
-					return program;
-				}
-
-				// 在Windows上检查.exe后缀
-				if (isWindows) {
-					Path exePath = Paths.get(dir, program + ".exe");
-					if (Files.exists(exePath) && Files.isExecutable(exePath)) {
-						return program;
-					}
-				}
-			}
-		}
-		return null;
+	private static LocalPrograms locatePrograms(ExecutableProgramLocator locator) {
+		String python = locator.findFirst(PYTHON_NAMES)
+			.orElseThrow(() -> new IllegalStateException(
+					"No valid Python interpreter was found in PATH. Please install Python 3."));
+		String pip = locator.findFirst(PIP_NAMES).orElse(null);
+		return new LocalPrograms(python, pip);
 	}
 
-	private long parseToMilliseconds(String timeString) {
-		Pattern pattern = Pattern.compile("(\\d+)(ms|[smhd])");
-		Matcher matcher = pattern.matcher(timeString.toLowerCase());
-
-		if (matcher.find()) {
-			long value = Long.parseLong(matcher.group(1));
-			String unit = matcher.group(2);
-			return switch (unit) {
-				case "ms" -> value;
-				case "s" -> value * 1000;
-				case "m" -> value * 60 * 1000;
-				case "h" -> value * 60 * 60 * 1000;
-				case "d" -> value * 24 * 60 * 60 * 1000;
-				default -> {
-					log.warn("Unknown time unit: {}", unit);
-					// 返回默认值60s
-					yield 60 * 1000;
-				}
-			};
-		}
-		log.warn("Invalid time format: {}", timeString);
-		return 60 * 1000;
+	private record LocalPrograms(String pythonExecutable, String pipExecutable) {
 	}
 
 }

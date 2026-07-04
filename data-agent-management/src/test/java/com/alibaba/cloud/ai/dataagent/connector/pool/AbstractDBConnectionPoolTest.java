@@ -22,12 +22,15 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import javax.sql.DataSource;
-import java.lang.reflect.Field;
 import java.sql.Connection;
 import java.sql.SQLException;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 class AbstractDBConnectionPoolTest {
 
@@ -39,13 +42,13 @@ class AbstractDBConnectionPoolTest {
 
 	@BeforeEach
 	void setUp() {
-		pool = new TestableDBConnectionPool();
+		pool = new TestableDBConnectionPool(new ConnectionRetryPolicy(3, ignored -> {
+		}));
 	}
 
 	@AfterEach
-	void tearDown() throws Exception {
+	void tearDown() {
 		pool.close();
-		clearDataSourceCache();
 	}
 
 	@Test
@@ -96,25 +99,52 @@ class AbstractDBConnectionPoolTest {
 		assertNotNull(conn1);
 		conn1.close();
 
-		int cacheSize1 = getDataSourceCacheSize();
-
 		Connection conn2 = pool.getConnection(config);
 		assertNotNull(conn2);
 		conn2.close();
 
-		int cacheSize2 = getDataSourceCacheSize();
-		assertEquals(cacheSize1, cacheSize2);
+		assertEquals(1, pool.getDataSourceCreationCount());
 	}
 
 	@Test
-	void getConnection_invalidUrl_throwsRuntimeException() {
+	void getConnection_failingDataSource_retriesThreeTimesAndThrows() throws SQLException {
+		DataSource failingDataSource = mock(DataSource.class);
+		when(failingDataSource.getConnection()).thenThrow(new SQLException("unavailable"));
+		pool.useDataSource(failingDataSource);
 		DbConfigBO config = DbConfigBO.builder()
-			.url("jdbc:invalid://nowhere:9999/nothing")
+			.url("jdbc:test:unavailable")
 			.username("nobody")
 			.password("nothing")
 			.connectionType("h2")
 			.build();
-		assertThrows(RuntimeException.class, () -> pool.getConnection(config));
+
+		RuntimeException error = assertThrows(RuntimeException.class, () -> pool.getConnection(config));
+
+		assertTrue(error.getMessage().contains("3 attempts"));
+		verify(failingDataSource, times(3)).getConnection();
+	}
+
+	@Test
+	void getConnection_interruptedBackoff_restoresInterruptAndStopsRetrying() throws SQLException {
+		TestableDBConnectionPool interruptedPool = new TestableDBConnectionPool(
+				new ConnectionRetryPolicy(3, ignored -> {
+					throw new InterruptedException("cancelled");
+				}));
+		DataSource failingDataSource = mock(DataSource.class);
+		when(failingDataSource.getConnection()).thenThrow(new SQLException("unavailable"));
+		interruptedPool.useDataSource(failingDataSource);
+
+		try {
+			IllegalStateException error = assertThrows(IllegalStateException.class,
+					() -> interruptedPool.getConnection(createH2Config()));
+			assertTrue(error.getMessage().contains("Interrupted"));
+			assertTrue(Thread.currentThread().isInterrupted());
+			verify(failingDataSource).getConnection();
+		}
+		finally {
+			Thread.interrupted();
+			interruptedPool.close();
+		}
 	}
 
 	@Test
@@ -124,11 +154,13 @@ class AbstractDBConnectionPoolTest {
 		assertNotNull(connection);
 		connection.close();
 
-		assertTrue(getDataSourceCacheSize() > 0);
+		assertEquals(1, pool.getDataSourceCreationCount());
 
 		pool.close();
 
-		assertEquals(0, getDataSourceCacheSize());
+		Connection connectionAfterClose = pool.getConnection(config);
+		connectionAfterClose.close();
+		assertEquals(2, pool.getDataSourceCreationCount());
 	}
 
 	@Test
@@ -191,23 +223,29 @@ class AbstractDBConnectionPoolTest {
 		return ++dbCounter;
 	}
 
-	@SuppressWarnings("unchecked")
-	private int getDataSourceCacheSize() throws Exception {
-		Field cacheField = AbstractDBConnectionPool.class.getDeclaredField("DATA_SOURCE_CACHE");
-		cacheField.setAccessible(true);
-		ConcurrentHashMap<String, DataSource> cache = (ConcurrentHashMap<String, DataSource>) cacheField.get(null);
-		return cache.size();
-	}
-
-	@SuppressWarnings("unchecked")
-	private void clearDataSourceCache() throws Exception {
-		Field cacheField = AbstractDBConnectionPool.class.getDeclaredField("DATA_SOURCE_CACHE");
-		cacheField.setAccessible(true);
-		ConcurrentHashMap<String, DataSource> cache = (ConcurrentHashMap<String, DataSource>) cacheField.get(null);
-		cache.clear();
-	}
-
 	static class TestableDBConnectionPool extends AbstractDBConnectionPool {
+
+		private final AtomicInteger dataSourceCreationCount = new AtomicInteger();
+
+		private DataSource dataSource;
+
+		TestableDBConnectionPool(ConnectionRetryPolicy retryPolicy) {
+			super(retryPolicy);
+		}
+
+		void useDataSource(DataSource dataSource) {
+			this.dataSource = dataSource;
+		}
+
+		int getDataSourceCreationCount() {
+			return dataSourceCreationCount.get();
+		}
+
+		@Override
+		public DataSource createdDataSource(String url, String username, String password) throws Exception {
+			dataSourceCreationCount.incrementAndGet();
+			return dataSource != null ? dataSource : super.createdDataSource(url, username, password);
+		}
 
 		@Override
 		public String getDriver() {

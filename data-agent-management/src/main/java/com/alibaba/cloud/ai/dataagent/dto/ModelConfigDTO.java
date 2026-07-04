@@ -52,13 +52,17 @@ public class ModelConfigDTO {
 	// 仅当厂商路径非标准时填写
 	private String embeddingsPath;
 
+	@Builder.Default
 	private Double temperature = 0.0;
 
+	@Builder.Default
 	private Integer maxTokens = 2000;
 
+	@Builder.Default
 	private Boolean isActive = true;
 
 	// 模型代理配置，默认关闭（使用直连）
+	@Builder.Default
 	private Boolean proxyEnabled = false;
 
 	private String proxyHost;

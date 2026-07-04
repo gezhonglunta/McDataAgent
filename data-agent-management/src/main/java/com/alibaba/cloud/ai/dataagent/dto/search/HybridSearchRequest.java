@@ -36,6 +36,7 @@ public class HybridSearchRequest implements Serializable {
 
 	private Integer topK;
 
+	@Builder.Default
 	private double similarityThreshold = 0.0;
 
 	private Filter.Expression filterExpression;

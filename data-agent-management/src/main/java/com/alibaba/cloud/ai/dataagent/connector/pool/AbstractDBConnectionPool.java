@@ -39,6 +39,16 @@ public abstract class AbstractDBConnectionPool implements DBConnectionPool {
 	 */
 	private static final ConcurrentHashMap<String, DataSource> DATA_SOURCE_CACHE = new ConcurrentHashMap<>();
 
+	private final ConnectionRetryPolicy retryPolicy;
+
+	protected AbstractDBConnectionPool() {
+		this(ConnectionRetryPolicy.defaults());
+	}
+
+	protected AbstractDBConnectionPool(ConnectionRetryPolicy retryPolicy) {
+		this.retryPolicy = Objects.requireNonNull(retryPolicy, "retryPolicy");
+	}
+
 	/**
 	 * Driver
 	 */
@@ -81,10 +91,9 @@ public abstract class AbstractDBConnectionPool implements DBConnectionPool {
 	public Connection getConnection(DbConfigBO config) {
 
 		String jdbcUrl = config.getUrl();
-		int maxRetries = 3;
-		int retryDelay = 1000; // 1 second
+		int maxAttempts = retryPolicy.maxAttempts();
 
-		for (int attempt = 1; attempt <= maxRetries; attempt++) {
+		for (int attempt = 1; attempt <= maxAttempts; attempt++) {
 			try {
 				// Generate cache key based on connection parameters
 				String cacheKey = generateCacheKey(jdbcUrl, config.getUsername(), config.getPassword());
@@ -116,18 +125,20 @@ public abstract class AbstractDBConnectionPool implements DBConnectionPool {
 			catch (Exception e) {
 				log.warn("Attempt {} to get database connection failed: {}", attempt, e.getMessage());
 
-				if (attempt == maxRetries) {
-					log.error("Failed to get database connection after {} attempts, URL: {}", maxRetries, jdbcUrl, e);
-					throw new RuntimeException("Failed to get database connection after " + maxRetries + " attempts",
+				if (attempt == maxAttempts) {
+					log.error("Failed to get database connection after {} attempts, URL: {}", maxAttempts, jdbcUrl, e);
+					throw new RuntimeException("Failed to get database connection after " + maxAttempts + " attempts",
 							e);
 				}
 
-				// Wait before retry with exponential backoff
+				// Wait before retry with incremental backoff
 				try {
-					Thread.sleep((long) retryDelay * attempt);
+					retryPolicy.pauseAfterFailure(attempt);
 				}
-				catch (InterruptedException ignore) {
-
+				catch (InterruptedException interruptedException) {
+					Thread.currentThread().interrupt();
+					throw new IllegalStateException("Interrupted while retrying database connection",
+							interruptedException);
 				}
 			}
 		}

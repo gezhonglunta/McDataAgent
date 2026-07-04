@@ -25,6 +25,7 @@ import com.alibaba.cloud.ai.graph.RunnableConfig;
 import com.alibaba.cloud.ai.graph.StateGraph;
 import com.alibaba.cloud.ai.graph.exception.GraphRunnerException;
 import io.opentelemetry.api.trace.Span;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -36,7 +37,6 @@ import org.springframework.http.codec.ServerSentEvent;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Sinks;
 
-import java.lang.reflect.Field;
 import java.util.Optional;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -74,17 +74,14 @@ class GraphServiceImplTest {
 
 		graphService = new GraphServiceImpl(mockStateGraph, executor, multiTurnContextManager, langfuseReporter);
 
-		setField(graphService, "compiledGraph", compiledGraph);
-
 		when(langfuseReporter.startLLMSpan(anyString(), any())).thenReturn(mockSpan);
 		when(mockSpan.isRecording()).thenReturn(true);
 		when(multiTurnContextManager.buildContext(anyString())).thenReturn("(无)");
 	}
 
-	private void setField(Object target, String fieldName, Object value) throws Exception {
-		Field field = target.getClass().getDeclaredField(fieldName);
-		field.setAccessible(true);
-		field.set(target, value);
+	@AfterEach
+	void tearDown() {
+		executor.shutdownNow();
 	}
 
 	@Test

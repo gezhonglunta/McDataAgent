@@ -16,107 +16,61 @@
 package com.alibaba.cloud.ai.dataagent.service.code.impls;
 
 import com.alibaba.cloud.ai.dataagent.properties.CodeExecutorProperties;
-import org.junit.jupiter.api.BeforeAll;
+import com.alibaba.cloud.ai.dataagent.service.code.local.ExecutableProgramLocator;
+import com.alibaba.cloud.ai.dataagent.service.code.local.ExecutionTimeoutParser;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.condition.EnabledIf;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.lang.reflect.Method;
+import java.util.Optional;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.Mockito.when;
 
+@ExtendWith(MockitoExtension.class)
 class LocalCodePoolExecutorServiceTest {
 
-	private static LocalCodePoolExecutorService service;
+	@Mock
+	private ExecutableProgramLocator programLocator;
 
-	private static boolean pythonAvailable = false;
+	private final ExecutionTimeoutParser timeoutParser = new ExecutionTimeoutParser();
 
-	@BeforeAll
-	static void init() {
+	@Test
+	void constructor_pythonAvailable_constructsWithoutInspectingMachinePath() {
+		when(programLocator.findFirst(anyList())).thenReturn(Optional.of("python-test"), Optional.empty());
+
+		LocalCodePoolExecutorService service =
+				new LocalCodePoolExecutorService(properties(), programLocator, timeoutParser);
+
+		assertDoesNotThrow(service::close);
+	}
+
+	@Test
+	void constructor_pythonUnavailable_throwsSpecificConfigurationFailure() {
+		when(programLocator.findFirst(anyList())).thenReturn(Optional.empty());
+
+		IllegalStateException error = assertThrows(IllegalStateException.class,
+				() -> new LocalCodePoolExecutorService(properties(), programLocator, timeoutParser));
+
+		assertTrue(error.getMessage().contains("Python"));
+	}
+
+	private CodeExecutorProperties properties() {
 		CodeExecutorProperties properties = new CodeExecutorProperties();
 		properties.setContainerNamePrefix("test-local-");
 		properties.setCodeTimeout("60s");
 		properties.setContainerTimeout(5L);
-		try {
-			service = new LocalCodePoolExecutorService(properties);
-			pythonAvailable = true;
-		}
-		catch (IllegalStateException e) {
-			pythonAvailable = false;
-		}
-	}
-
-	static boolean isPythonAvailable() {
-		return pythonAvailable;
-	}
-
-	private long callParseToMilliseconds(String timeString) throws Exception {
-		Method method = LocalCodePoolExecutorService.class.getDeclaredMethod("parseToMilliseconds", String.class);
-		method.setAccessible(true);
-		return (long) method.invoke(service, timeString);
-	}
-
-	@Test
-	@EnabledIf("isPythonAvailable")
-	void parseToMilliseconds_seconds_returns30000() throws Exception {
-		assertEquals(30000, callParseToMilliseconds("30s"));
-	}
-
-	@Test
-	@EnabledIf("isPythonAvailable")
-	void parseToMilliseconds_milliseconds_returns500() throws Exception {
-		assertEquals(500, callParseToMilliseconds("500ms"));
-	}
-
-	@Test
-	@EnabledIf("isPythonAvailable")
-	void parseToMilliseconds_minutes_returns120000() throws Exception {
-		assertEquals(120000, callParseToMilliseconds("2m"));
-	}
-
-	@Test
-	@EnabledIf("isPythonAvailable")
-	void parseToMilliseconds_hours_returns3600000() throws Exception {
-		assertEquals(3600000, callParseToMilliseconds("1h"));
-	}
-
-	@Test
-	@EnabledIf("isPythonAvailable")
-	void parseToMilliseconds_days_returns86400000() throws Exception {
-		assertEquals(86400000, callParseToMilliseconds("1d"));
-	}
-
-	@Test
-	@EnabledIf("isPythonAvailable")
-	void parseToMilliseconds_invalidFormat_returnsDefault60000() throws Exception {
-		assertEquals(60000, callParseToMilliseconds("invalid"));
-	}
-
-	@Test
-	@EnabledIf("isPythonAvailable")
-	void parseToMilliseconds_zeroSeconds_returnsZero() throws Exception {
-		assertEquals(0, callParseToMilliseconds("0s"));
-	}
-
-	@Test
-	@EnabledIf("isPythonAvailable")
-	void parseToMilliseconds_largeValue_returnsCorrect() throws Exception {
-		assertEquals(100000, callParseToMilliseconds("100s"));
-	}
-
-	@Test
-	void constructor_noPythonOrWithPython_handledGracefully() {
-		CodeExecutorProperties properties = new CodeExecutorProperties();
-		properties.setContainerNamePrefix("test-check-");
-		properties.setCodeTimeout("60s");
-		properties.setContainerTimeout(5L);
-
-		try {
-			LocalCodePoolExecutorService svc = new LocalCodePoolExecutorService(properties);
-			assertNotNull(svc);
-		}
-		catch (IllegalStateException e) {
-			assertTrue(e.getMessage().contains("Python"));
-		}
+		properties.setTaskQueueSize(2);
+		properties.setCoreContainerNum(1);
+		properties.setTempContainerNum(1);
+		properties.setCoreThreadSize(1);
+		properties.setMaxThreadSize(1);
+		properties.setThreadQueueSize(2);
+		return properties;
 	}
 
 }

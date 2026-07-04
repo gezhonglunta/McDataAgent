@@ -35,6 +35,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
@@ -44,7 +45,9 @@ import java.util.concurrent.atomic.AtomicInteger;
  * @since 2025/7/12
  */
 @Slf4j
-public abstract class AbstractCodePoolExecutorService implements CodePoolExecutorService {
+public abstract class AbstractCodePoolExecutorService implements CodePoolExecutorService, AutoCloseable {
+
+	private final AtomicBoolean closed = new AtomicBoolean();
 
 	// Record core container status
 	protected final ConcurrentHashMap<String, CodePoolExecutorService.State> coreContainerState;
@@ -89,15 +92,19 @@ public abstract class AbstractCodePoolExecutorService implements CodePoolExecuto
 				new ArrayBlockingQueue<>(properties.getThreadQueueSize()));
 		this.currentCoreContainerSize = new AtomicInteger(0);
 		this.currentTempContainerSize = new AtomicInteger(0);
-		// Register shutdown hook
-		Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-			log.info("Shutting down container pool executor...");
-			try {
-				this.shutdownPool();
-			}
-			catch (Exception ignored) {
-			}
-		}));
+	}
+
+	@Override
+	public final void close() {
+		if (!closed.compareAndSet(false, true)) {
+			return;
+		}
+		try {
+			this.shutdownPool();
+		}
+		catch (Exception exception) {
+			throw new IllegalStateException("Failed to close code pool executor", exception);
+		}
 	}
 
 	/**

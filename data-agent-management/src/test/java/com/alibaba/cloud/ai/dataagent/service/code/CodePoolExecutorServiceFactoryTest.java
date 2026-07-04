@@ -17,7 +17,9 @@ package com.alibaba.cloud.ai.dataagent.service.code;
 
 import com.alibaba.cloud.ai.dataagent.enums.CodePoolExecutorEnum;
 import com.alibaba.cloud.ai.dataagent.properties.CodeExecutorProperties;
+import com.alibaba.cloud.ai.dataagent.service.code.docker.DockerExecutorFactory;
 import com.alibaba.cloud.ai.dataagent.service.code.impls.AiSimulationCodeExecutorService;
+import com.alibaba.cloud.ai.dataagent.service.code.impls.DockerCodePoolExecutorService;
 import com.alibaba.cloud.ai.dataagent.service.llm.LlmService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -37,11 +39,25 @@ class CodePoolExecutorServiceFactoryTest {
 	@Mock
 	private LlmService llmService;
 
+	@Mock
+	private DockerExecutorFactory dockerExecutorFactory;
+
+	@Mock
+	private DockerCodePoolExecutorService dockerExecutor;
+
 	private CodePoolExecutorServiceFactory factory;
 
 	@BeforeEach
 	void setUp() {
-		factory = new CodePoolExecutorServiceFactory(properties, llmService);
+		factory = new CodePoolExecutorServiceFactory(properties, llmService, dockerExecutorFactory);
+	}
+
+	@Test
+	void testGetObject_docker() {
+		when(properties.getCodePoolExecutor()).thenReturn(CodePoolExecutorEnum.DOCKER);
+		when(dockerExecutorFactory.create(properties)).thenReturn(dockerExecutor);
+
+		assertSame(dockerExecutor, factory.getObject());
 	}
 
 	@Test

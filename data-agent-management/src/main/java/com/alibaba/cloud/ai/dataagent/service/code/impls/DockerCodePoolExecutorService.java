@@ -20,7 +20,6 @@ import com.alibaba.cloud.ai.dataagent.service.code.CodePoolExecutorService;
 import com.github.dockerjava.api.DockerClient;
 import com.github.dockerjava.api.command.CreateContainerResponse;
 import com.github.dockerjava.api.command.InspectContainerResponse;
-import com.github.dockerjava.api.command.PullImageResultCallback;
 import com.github.dockerjava.api.async.ResultCallback;
 import com.github.dockerjava.api.model.AccessMode;
 import com.github.dockerjava.api.model.Bind;
@@ -29,20 +28,14 @@ import com.github.dockerjava.api.model.Frame;
 import com.github.dockerjava.api.model.HostConfig;
 import com.github.dockerjava.api.model.StreamType;
 import com.github.dockerjava.api.model.Volume;
-import com.github.dockerjava.core.DefaultDockerClientConfig;
-import com.github.dockerjava.core.DockerClientConfig;
-import com.github.dockerjava.core.DockerClientImpl;
-import com.github.dockerjava.zerodep.ZerodepDockerHttpClient;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.util.StringUtils;
 
 import java.io.IOException;
-import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -66,181 +59,14 @@ public class DockerCodePoolExecutorService extends AbstractCodePoolExecutorServi
 
 	private final ConcurrentHashMap<String, Path> containerTempPath;
 
-	public DockerCodePoolExecutorService(CodeExecutorProperties properties) {
+	public DockerCodePoolExecutorService(CodeExecutorProperties properties, DockerClient dockerClient,
+			boolean isRemote) {
 		super(properties);
-		// Initialize DockerClient
-		String dockerHost = this.getDockerHostForCurrentOS(properties.getHost());
-		DockerClientConfig config = DefaultDockerClientConfig.createDefaultConfigBuilder()
-			.withDockerHost(dockerHost)
-			.withDockerTlsVerify(false)
-			.build();
-		this.dockerClient = this.createDockerClientWithFallback(config);
-		this.isRemote = this.checkIsRemote(properties.getHost());
+		this.dockerClient = Objects.requireNonNull(dockerClient, "dockerClient");
+		this.isRemote = isRemote;
+		this.containerTempPath = new ConcurrentHashMap<>();
 		log.info("Docker Code Pool initialized. Mode: {}",
 				this.isRemote ? "Remote (Copy Files)" : "Local (Bind Mounts)");
-
-		this.containerTempPath = new ConcurrentHashMap<>();
-
-		// Check if image exists locally
-		boolean imageExists = this.dockerClient.listImagesCmd()
-			.withImageNameFilter(properties.getImageName())
-			.exec()
-			.stream()
-			.anyMatch(image -> Arrays.asList(image.getRepoTags()).contains(properties.getImageName()));
-
-		if (!imageExists) {
-			// Pull image
-			try {
-				this.dockerClient.pullImageCmd(properties.getImageName())
-					.exec(new PullImageResultCallback())
-					.awaitCompletion();
-				log.info("pull image {} success", properties.getImageName());
-			}
-			catch (Exception e) {
-				log.error("pull image {} error", properties.getImageName(), e);
-				throw new RuntimeException(e);
-			}
-		}
-	}
-
-	/**
-	 * Automatically select appropriate Docker Host address based on current operating
-	 * system
-	 * @return Docker Host URI
-	 */
-	private String getDockerHostForCurrentOS(String dockerHost) {
-		// If configuration object has value, directly use configuration object's value
-		if (StringUtils.hasText(dockerHost)) {
-			return dockerHost;
-		}
-		String osName = System.getProperty("os.name").toLowerCase();
-		log.info("Detected operating system: {}", osName);
-
-		if (osName.contains("win")) {
-			// Windows系统
-			log.info("Using Windows Docker configuration");
-			// On Windows, try TCP connection first, more stable
-			return "tcp://localhost:2375";
-		}
-		else if (osName.contains("nix") || osName.contains("nux") || osName.contains("aix")) {
-			// Linux/Unix系统
-			log.info("Using Linux/Unix Docker configuration");
-			return "unix:///var/run/docker.sock";
-		}
-		else if (osName.contains("mac")) {
-			// macOS系统
-			log.info("Using macOS Docker configuration");
-			return "unix:///var/run/docker.sock";
-		}
-		else {
-			// Unknown system, use default value from configuration file
-			log.warn("Unknown operating system: {}, using default docker host", osName);
-			return "unix:///var/run/docker.sock";
-		}
-	}
-
-	private boolean checkIsRemote(String host) {
-		if (!StringUtils.hasText(host)) {
-			// Empty host means using defaults which are local (unix socket or npipe or
-			// localhost)
-			return false;
-		}
-		try {
-			URI uri = URI.create(host);
-			String scheme = uri.getScheme();
-			if ("unix".equalsIgnoreCase(scheme) || "npipe".equalsIgnoreCase(scheme)) {
-				return false;
-			}
-			// 处理TCP协议
-			if ("tcp".equalsIgnoreCase(scheme)) {
-				String h = uri.getHost();
-				// 本地地址包括：localhost、127.0.0.1、::1（IPv6本地回环）
-				boolean isLocalTcp = "localhost".equalsIgnoreCase(h) || "127.0.0.1".equals(h) || "::1".equals(h);
-				return !isLocalTcp; // 不是本地TCP地址则为远程
-			}
-			return false;
-		}
-		catch (Exception e) {
-			log.warn("Failed to parse Docker host URI: {}, assuming local.", host);
-			return false;
-		}
-	}
-
-	/**
-	 * Create Docker client, supports fallback mechanism for multiple connection methods
-	 * @param config Docker client configuration
-	 * @return DockerClient instance
-	 * @throws Exception if all connection methods fail
-	 */
-	private DockerClient createDockerClientWithFallback(DockerClientConfig config) {
-		String osName = System.getProperty("os.name").toLowerCase();
-
-		if (osName.contains("win")) {
-			// Windows System: Try the configured host first, then fallbacks
-			List<String> windowsHosts = new ArrayList<>();
-			// 1. Priority: The host from configuration (which might be user-provided or
-			// auto-detected)
-			if (StringUtils.hasText(String.valueOf(config.getDockerHost()))) {
-				windowsHosts.add(String.valueOf(config.getDockerHost()));
-			}
-			// 2. Fallback: Standard Windows Docker Desktop named pipe
-			windowsHosts.add("npipe://./pipe/docker_engine");
-			// 3. Fallback: Localhost TCP (common setting)
-			windowsHosts.add("tcp://localhost:2375");
-
-			for (String dockerHost : windowsHosts) {
-				try {
-					log.info("Attempting to connect to Docker using: {}", dockerHost);
-
-					DockerClientConfig testConfig = DefaultDockerClientConfig.createDefaultConfigBuilder()
-						.withDockerHost(dockerHost)
-						.withDockerTlsVerify(false)
-						.build();
-
-					ZerodepDockerHttpClient httpClient = new ZerodepDockerHttpClient.Builder()
-						.dockerHost(testConfig.getDockerHost())
-						.sslConfig(testConfig.getSSLConfig())
-						.build();
-
-					DockerClient dockerClient = DockerClientImpl.getInstance(testConfig, httpClient);
-
-					// Test if connection is normal
-					dockerClient.pingCmd().exec();
-					log.info("Successfully connected to Docker using: {}", dockerHost);
-					return dockerClient;
-
-				}
-				catch (Exception e) {
-					log.warn("Failed to connect using {}: {}", dockerHost, e.getMessage());
-				}
-			}
-
-			// If all Windows connection methods fail
-			throw new RuntimeException(
-					"Failed to connect to Docker on Windows. Please ensure Docker Desktop is running and either:\n"
-							+ "1. Enable 'Expose daemon on tcp://localhost:2375 without TLS' in Docker Desktop settings, or\n"
-							+ "2. Ensure Docker Desktop's named pipe is available");
-
-		}
-		else {
-			// Linux/Unix/macOS系统：使用标准Unix socket
-			try {
-				ZerodepDockerHttpClient httpClient = new ZerodepDockerHttpClient.Builder()
-					.dockerHost(config.getDockerHost())
-					.sslConfig(config.getSSLConfig())
-					.build();
-
-				DockerClient dockerClient = DockerClientImpl.getInstance(config, httpClient);
-				dockerClient.pingCmd().exec(); // Test connection
-				log.info("Successfully connected to Docker using: {}", config.getDockerHost());
-				return dockerClient;
-
-			}
-			catch (Exception e) {
-				throw new RuntimeException("Failed to connect to Docker on " + osName + ": " + e.getMessage()
-						+ "\nPlease ensure Docker is running and accessible at: " + config.getDockerHost());
-			}
-		}
 	}
 
 	/**
