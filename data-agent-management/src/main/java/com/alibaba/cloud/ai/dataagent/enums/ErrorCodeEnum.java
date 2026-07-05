@@ -80,6 +80,11 @@ public enum ErrorCodeEnum {
 	PASSWORD_ERROR_28000("28000", "密码错误"),
 
 	/**
+	 * Password is empty
+	 */
+	PASSWORD_EMPTY("28001", "密码为空，请配置正确的数据库密码"),
+
+	/**
 	 * Database does not exist (SQLState: 3D000)
 	 */
 	DATABASE_NOT_EXIST_3D000("3D000", "数据库不存在"),

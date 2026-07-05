@@ -60,7 +60,7 @@ class ErrorCodeEnumTest {
 
 	@Test
 	void testValues() {
-		assertEquals(17, ErrorCodeEnum.values().length);
+		assertEquals(18, ErrorCodeEnum.values().length);
 	}
 
 }

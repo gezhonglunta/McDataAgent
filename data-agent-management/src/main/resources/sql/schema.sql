@@ -193,7 +193,7 @@ CREATE TABLE IF NOT EXISTS chat_message (
   id BIGINT NOT NULL AUTO_INCREMENT,
   session_id VARCHAR(36) NOT NULL COMMENT '会话ID',
   role VARCHAR(20) NOT NULL COMMENT '角色：user-用户，assistant-助手，system-系统',
-  content TEXT NOT NULL COMMENT '消息内容',
+  content MEDIUMTEXT NOT NULL COMMENT '消息内容',
   message_type VARCHAR(50) DEFAULT 'text' COMMENT '消息类型：text-文本，sql-SQL查询，result-查询结果，error-错误',
   metadata JSON COMMENT '元数据（JSON格式）',
   create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',

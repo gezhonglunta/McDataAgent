@@ -31,6 +31,11 @@ export interface AgentDatasource {
 	datasource?: any;
 }
 
+export interface UpdateDatasourceTablesDto {
+	datasourceId?: number;
+	tables?: string[];
+}
+
 const BASE_URL_FUNC = (agentId: string) => `/api/agent/${agentId}/datasources`;
 
 class AgentDatasourceService {
@@ -52,6 +57,29 @@ class AgentDatasourceService {
 		return await $fetch<ApiResponse<AgentDatasource>>(
 			`${BASE_URL_FUNC(agentId)}/active`,
 		);
+	}
+
+	/**
+	 * 为智能体添加数据源关联
+	 * @param agentId 智能体ID
+	 * @param datasourceId 数据源ID
+	 */
+	async addDatasourceToAgent(agentId: string, datasourceId: number): Promise<ApiResponse<AgentDatasource>> {
+		return await $fetch<ApiResponse<AgentDatasource>>(`${BASE_URL_FUNC(agentId)}/${datasourceId}`, {
+			method: 'POST',
+		});
+	}
+
+	/**
+	 * 更新智能体数据源选中的表
+	 * @param agentId 智能体ID
+	 * @param dto 更新参数
+	 */
+	async updateDatasourceTables(agentId: string, dto: UpdateDatasourceTablesDto): Promise<ApiResponse<null>> {
+		return await $fetch<ApiResponse<null>>(`${BASE_URL_FUNC(agentId)}/tables`, {
+			method: 'POST',
+			body: dto,
+		});
 	}
 }
 

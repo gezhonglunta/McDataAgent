@@ -123,6 +123,14 @@ public class DatasourceServiceImpl implements DatasourceService {
 		}
 		datasource.setId(id);
 
+		// 密码为空时保留原密码，避免因前端未传密码导致密码被清空
+		if (datasource.getPassword() == null || datasource.getPassword().isEmpty()) {
+			Datasource existing = datasourceMapper.selectById(id);
+			if (existing != null && existing.getPassword() != null) {
+				datasource.setPassword(existing.getPassword());
+			}
+		}
+		// 兜底：如果密码仍为 null（原有密码也为 null），设为空字符串
 		if (datasource.getPassword() == null) {
 			datasource.setPassword("");
 		}

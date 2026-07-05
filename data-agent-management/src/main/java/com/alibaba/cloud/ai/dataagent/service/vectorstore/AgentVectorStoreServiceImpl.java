@@ -140,7 +140,19 @@ public class AgentVectorStoreServiceImpl implements AgentVectorStoreService {
 			batchDelDocumentsWithFilter(filterExpression);
 		}
 		else {
-			vectorStore.delete(filterExpression);
+			try {
+				vectorStore.delete(filterExpression);
+			}
+			catch (Exception e) {
+				// Collection 不存在时（首次初始化），delete 会报错，这是正常的，忽略即可
+				String msg = e.getMessage();
+				if (msg != null && msg.contains("collection not found")) {
+					log.info("Collection not found, skip delete (first initialization): {}", filterExpression);
+				}
+				else {
+					throw e;
+				}
+			}
 		}
 
 		return true;
@@ -160,7 +172,18 @@ public class AgentVectorStoreServiceImpl implements AgentVectorStoreService {
 			batchDelDocumentsWithFilter(filterExpression);
 		}
 		else {
-			vectorStore.delete(filterExpression);
+			try {
+				vectorStore.delete(filterExpression);
+			}
+			catch (Exception e) {
+				String msg = e.getMessage();
+				if (msg != null && msg.contains("collection not found")) {
+					log.info("Collection not found, skip delete (first initialization): {}", filterExpression);
+				}
+				else {
+					throw e;
+				}
+			}
 		}
 
 		return true;

@@ -65,6 +65,12 @@ public abstract class AbstractDBConnectionPool implements DBConnectionPool {
 
 	public ErrorCodeEnum ping(DbConfigBO config) {
 		String jdbcUrl = config.getUrl();
+		// H2 内嵌数据库允许空密码，其他数据库类型必须配置密码
+		boolean isH2 = "h2".equalsIgnoreCase(config.getConnectionType());
+		if (!isH2 && (config.getPassword() == null || config.getPassword().isEmpty())) {
+			log.error("test db connection skipped: password is empty, url:{}", jdbcUrl);
+			return ErrorCodeEnum.PASSWORD_EMPTY;
+		}
 		try (Connection connection = DriverManager.getConnection(jdbcUrl, config.getUsername(), config.getPassword());
 				Statement stmt = connection.createStatement();) {
 			if (BizDataSourceTypeEnum.isPgDialect(config.getConnectionType())) {

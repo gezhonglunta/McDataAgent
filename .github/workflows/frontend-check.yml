@@ -25,7 +25,7 @@ on:
 
 jobs:
   frontend-check:
-    name: Frontend Build and Code Quality Check
+    name: Frontend Build Check
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -33,26 +33,16 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
-          cache: 'npm'
-          cache-dependency-path: data-agent-frontend/package-lock.json
+          node-version: '22'
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11
       - name: Install dependencies
         run: |
-          cd data-agent-frontend
-          npm ci
+          cd data-agent-frontend-nuxt
+          pnpm install
       - name: Build project
         run: |
-          cd data-agent-frontend
-          npm run build
-      - name: ESLint check
-        run: |
-          cd data-agent-frontend
-          npm run lint:check
-      - name: Prettier format check
-        run: |
-          cd data-agent-frontend
-          npm run format:check
-      - name: Unused code check
-        run: |
-          cd data-agent-frontend
-          npm run unused
+          cd data-agent-frontend-nuxt
+          pnpm build

@@ -262,7 +262,7 @@ async function handleFileUpload(event: Event) {
 }
 
 function goBack() {
-	router.push('/agent');
+	router.push('/system/agents');
 }
 
 async function createAgent() {

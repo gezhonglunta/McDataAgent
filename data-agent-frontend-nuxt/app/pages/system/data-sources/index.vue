@@ -52,7 +52,7 @@
 					:loading="initStatus"
 					@click="handleInitDatasource"
 				>
-					{{ initStatus ? '初始化中...' : '初始化数据源' }}
+					{{ initStatus ? '初始化中...' : '初始化当前智能体数据源' }}
 				</v-btn>
 			</div>
 		</header>
@@ -171,6 +171,18 @@
 				<template #item.actions="{ item }">
 					<div class="d-flex align-center justify-end ga-1">
 						<v-btn
+							v-if="agentId"
+							variant="text"
+							size="small"
+							color="primary"
+							class="text-none font-weight-bold"
+							:loading="bindingDatasourceId === item.id"
+							:disabled="activeDatasourceId === item.id"
+							@click="handleBindDatasource(item)"
+						>
+							{{ activeDatasourceId === item.id ? '当前使用中' : '设为当前' }}
+						</v-btn>
+						<v-btn
 							variant="text"
 							size="small"
 							color="primary"
@@ -265,6 +277,7 @@ const loading = ref(false);
 const saving = ref(false);
 const testingId = ref<number | null>(null);
 const togglingStatusId = ref<number | null>(null);
+const bindingDatasourceId = ref<number | null>(null);
 const datasourceList = ref<Datasource[]>([]);
 const expandedRows = ref<readonly string[]>([]);
 const tableLists = ref<Record<number, string[]>>({});
@@ -273,6 +286,7 @@ const loadingTablesId = ref<number | null>(null);
 const tableFetchError = ref<Record<number, boolean>>({});
 const updatingTablesId = ref<number | null>(null);
 const initStatus = ref(false);
+const activeDatasourceId = ref<number | null>(null);
 
 const agentId = computed(() => {
 	const id = route.params.agentId || route.query.agentId;
@@ -319,6 +333,22 @@ async function fetchDatasources() {
 	}
 }
 
+async function fetchActiveDatasourceForAgent() {
+	if (!agentId.value) {
+		activeDatasourceId.value = null;
+		return;
+	}
+	try {
+		const res = await agentDatasourceService.getActiveAgentDatasource(agentId.value);
+		activeDatasourceId.value = res.success ? res.data?.datasourceId ?? null : null;
+		if (res.success && res.data?.datasourceId && res.data.selectTables) {
+			selectedTables.value[res.data.datasourceId] = [...res.data.selectTables];
+		}
+	} catch {
+		activeDatasourceId.value = null;
+	}
+}
+
 function openFormDialog(mode: 'create' | 'edit', item?: Datasource) {
 	formDialogMode.value = mode;
 	formDialogTarget.value = mode === 'edit' && item ? { ...item } : null;
@@ -344,6 +374,28 @@ async function handleFormSubmit(data: Datasource) {
 		});
 	} finally {
 		saving.value = false;
+	}
+}
+
+async function handleBindDatasource(item: Datasource) {
+	if (!agentId.value || !item.id) return;
+	if (activeDatasourceId.value === item.id) {
+		$tip('当前已是该智能体正在使用的数据源');
+		return;
+	}
+	bindingDatasourceId.value = item.id;
+	try {
+		const res = await agentDatasourceService.addDatasourceToAgent(agentId.value, item.id);
+		if (res.success) {
+			activeDatasourceId.value = item.id;
+			$tip('已设为当前智能体数据源');
+		} else {
+			$tip(res.message || '绑定失败', { color: 'error', icon: 'mdi-alert-circle' });
+		}
+	} catch {
+		$tip('绑定失败', { color: 'error', icon: 'mdi-alert-circle' });
+	} finally {
+		bindingDatasourceId.value = null;
 	}
 }
 
@@ -526,9 +578,15 @@ async function updateTables(item: Datasource) {
 	if (!item.id) return;
 	updatingTablesId.value = item.id;
 	try {
-		$tip(
-			`已选择 ${selectedTables.value[item.id]?.length ?? 0} 个表（表选择在智能体关联数据源时可配置）`,
-		);
+		const res = await agentDatasourceService.updateDatasourceTables(agentId.value || '', {
+			datasourceId: item.id,
+			tables: selectedTables.value[item.id] ?? [],
+		});
+		if (res.success) {
+			$tip(`已保存 ${selectedTables.value[item.id]?.length ?? 0} 个表`);
+		} else {
+			$tip(res.message || '更新失败', { color: 'error', icon: 'mdi-alert-circle' });
+		}
 	} finally {
 		updatingTablesId.value = null;
 	}
@@ -544,22 +602,24 @@ async function handleInitDatasource() {
 	}
 	initStatus.value = true;
 	try {
+		if (activeDatasourceId.value == null) await fetchActiveDatasourceForAgent();
 		const activeRes = await agentDatasourceService.getActiveAgentDatasource(
 			agentId.value,
 		);
 		if (!activeRes.success || !activeRes.data) {
-			$tip('当前智能体没有启用的数据源！请先添加并启用数据源', {
+			$tip('当前智能体没有绑定可用的数据源！请先绑定并启用数据源', {
 				color: 'error',
 				icon: 'mdi-alert-circle',
 			});
 			return;
 		}
 		const activeDatasource = activeRes.data;
+		activeDatasourceId.value = activeDatasource.datasourceId ?? null;
 		if (
 			!activeDatasource.selectTables ||
 			activeDatasource.selectTables.length === 0
 		) {
-			$tip('当前启用的数据源没有选择相应的数据表！请先选择数据表并更新', {
+			$tip('当前绑定的数据源没有选择相应的数据表！请先选择数据表并更新', {
 				color: 'error',
 				icon: 'mdi-alert-circle',
 			});
@@ -582,6 +642,7 @@ async function handleInitDatasource() {
 
 onMounted(() => {
 	fetchDatasources();
+	fetchActiveDatasourceForAgent();
 });
 </script>
 
