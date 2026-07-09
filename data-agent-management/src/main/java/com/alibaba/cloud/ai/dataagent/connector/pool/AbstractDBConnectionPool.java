@@ -179,7 +179,7 @@ public abstract class AbstractDBConnectionPool implements DBConnectionPool {
 		props.put(DruidDataSourceFactory.PROP_INITIALSIZE, "5");
 		props.put(DruidDataSourceFactory.PROP_MINIDLE, "5");
 		props.put(DruidDataSourceFactory.PROP_MAXACTIVE, "20");
-		props.put(DruidDataSourceFactory.PROP_MAXWAIT, "10000");
+		props.put(DruidDataSourceFactory.PROP_MAXWAIT, "60000");
 		props.put(DruidDataSourceFactory.PROP_TIMEBETWEENEVICTIONRUNSMILLIS, "60000");
 		props.put(DruidDataSourceFactory.PROP_FILTERS, filters);
 
