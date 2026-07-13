@@ -161,26 +161,32 @@ public class SqlExecuteNode implements NodeAction {
 				emitter.next(ChatResponseUtil.createPureResponse(strResultJson));
 				emitter.next(ChatResponseUtil.createPureResponse(TextType.RESULT_SET.getEndSign()));
 
-				// Update step results with the query output
-				Map<String, String> existingResults = StateUtil.getObjectValue(state, SQL_EXECUTE_NODE_OUTPUT,
-						Map.class, new HashMap<>());
-				Map<String, String> updatedResults = PlanProcessUtil.addStepResult(existingResults, currentStep,
-						strResultSetJson);
-
 				log.info("SQL execution successful, result count: {}",
 						resultSetBO.getData() != null ? resultSetBO.getData().size() : 0);
 
-				// 回写最终执行的sql，报告节点需要使用
-				ExecutionStep.ToolParameters currentStepParams = PlanProcessUtil.getCurrentExecutionStep(state)
-					.getToolParameters();
-				currentStepParams.setSqlQuery(sqlQuery);
+				// 先设置成功结果，防止后续 state 处理异常导致不必要的 SQL 重试
+				result.put(SQL_REGENERATE_REASON, SqlRetryDto.empty());
+				result.put(SQL_RESULT_LIST_MEMORY, resultSetBO.getData());
+				result.put(PLAN_CURRENT_STEP, currentStep + 1);
+				result.put(SQL_GENERATE_COUNT, 0);
 
-				// Prepare the final result object
-				// Store List of SQL query results for use by code execution node
-				// Reset sql generate count retry times when sql execute success
-				result.putAll(Map.of(SQL_EXECUTE_NODE_OUTPUT, updatedResults, SQL_REGENERATE_REASON,
-						SqlRetryDto.empty(), SQL_RESULT_LIST_MEMORY, resultSetBO.getData(), PLAN_CURRENT_STEP,
-						currentStep + 1, SQL_GENERATE_COUNT, 0));
+				// State 处理（非关键路径：即使失败也不应重试，因为 SQL 已成功执行）
+				try {
+					Map<String, String> existingResults = StateUtil.getObjectValue(state, SQL_EXECUTE_NODE_OUTPUT,
+							Map.class, new HashMap<>());
+					Map<String, String> updatedResults = PlanProcessUtil.addStepResult(existingResults, currentStep,
+							strResultSetJson);
+					result.put(SQL_EXECUTE_NODE_OUTPUT, updatedResults);
+
+					// 回写最终执行的sql，报告节点需要使用
+					ExecutionStep.ToolParameters currentStepParams = PlanProcessUtil.getCurrentExecutionStep(state)
+						.getToolParameters();
+					currentStepParams.setSqlQuery(sqlQuery);
+				}
+				catch (Exception stateEx) {
+					log.warn("State processing after successful SQL execution failed (non-critical): {}",
+							stateEx.getMessage());
+				}
 			}
 			catch (Exception e) {
 				String errorMessage = e.getMessage();

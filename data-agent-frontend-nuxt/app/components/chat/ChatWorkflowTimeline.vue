@@ -74,7 +74,7 @@
 						<!-- Result Set -->
 						<ChatResultSet
 							v-if="
-								step.block[0]?.textType === 'RESULT_SET' && step.block[0]?.text
+								step.block[0]?.textType === 'RESULT_SET' && step.block[0]?.text && store.requestOptions.showSqlResults
 							"
 							:data="safeParseJson(step.block[0].text)"
 							:page-size="10"
@@ -114,6 +114,9 @@ import { useEchartsRenderer } from '~/composables/useEchartsRenderer';
 import type { GraphNodeResponse } from '~/services/graph/index';
 import type { ResultData } from '~/services/resultSet/index';
 import ChatResultSet from './ChatResultSet.vue';
+import { useChatStore } from '~/stores/chat';
+
+const store = useChatStore();
 
 const props = withDefaults(
 	defineProps<{

@@ -17,7 +17,12 @@ package com.alibaba.cloud.ai.dataagent.service.agent;
 
 import com.alibaba.cloud.ai.dataagent.entity.Agent;
 import com.alibaba.cloud.ai.dataagent.entity.AgentDatasource;
+import com.alibaba.cloud.ai.dataagent.enums.EmbeddingStatus;
+import com.alibaba.cloud.ai.dataagent.mapper.AgentKnowledgeMapper;
+import com.alibaba.cloud.ai.dataagent.mapper.BusinessKnowledgeMapper;
+import com.alibaba.cloud.ai.dataagent.service.business.BusinessKnowledgeService;
 import com.alibaba.cloud.ai.dataagent.service.datasource.AgentDatasourceService;
+import com.alibaba.cloud.ai.dataagent.service.knowledge.AgentKnowledgeService;
 import com.alibaba.cloud.ai.dataagent.service.vectorstore.AgentVectorStoreService;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -40,6 +45,14 @@ public class AgentStartupInitialization implements ApplicationRunner, Disposable
 
 	private final AgentDatasourceService agentDatasourceService;
 
+	private final BusinessKnowledgeService businessKnowledgeService;
+
+	private final AgentKnowledgeService agentKnowledgeService;
+
+	private final BusinessKnowledgeMapper businessKnowledgeMapper;
+
+	private final AgentKnowledgeMapper agentKnowledgeMapper;
+
 	private final ExecutorService executorService;
 
 	@Override
@@ -48,7 +61,11 @@ public class AgentStartupInitialization implements ApplicationRunner, Disposable
 
 		try {
 			// 因为异步可以让初始化过程在后台运行，不会阻塞Spring启动主线程，提高启动速度和响应性；即使初始化很耗时也不会影响主程序正常启动。
-			CompletableFuture.runAsync(this::initializePublishedAgents, executorService).exceptionally(throwable -> {
+			CompletableFuture.runAsync(() -> {
+				initializePublishedAgents();
+				embedPendingBusinessKnowledge();
+				embedPendingAgentKnowledge();
+			}, executorService).exceptionally(throwable -> {
 				log.error("Error during agent initialization: {}", throwable.getMessage());
 				return null;
 			});
@@ -167,6 +184,91 @@ public class AgentStartupInitialization implements ApplicationRunner, Disposable
 		catch (Exception e) {
 			log.error("Failed to check initialization status for agent: {}, assuming not initialized", agentId, e);
 			return false;
+		}
+	}
+
+	/**
+	 * Auto-embed PENDING business knowledge records on startup.
+	 * <p>
+	 * Seed data inserted via data.sql has embedding_status='PENDING' but was never
+	 * embedded because it bypassed the addKnowledge API. This method finds all such
+	 * records (is_recall=1, is_deleted=0, embedding_status=PENDING) and triggers
+	 * embedding for each one.
+	 */
+	private void embedPendingBusinessKnowledge() {
+		try {
+			var allKnowledge = businessKnowledgeMapper.selectAll();
+			var pendingKnowledge = allKnowledge.stream()
+				.filter(k -> k.getEmbeddingStatus() == EmbeddingStatus.PENDING)
+				.filter(k -> k.getIsRecall() != null && k.getIsRecall() == 1)
+				.toList();
+
+			if (pendingKnowledge.isEmpty()) {
+				log.info("No pending business knowledge to embed");
+				return;
+			}
+
+			log.info("Found {} pending business knowledge records, starting auto-embedding...",
+					pendingKnowledge.size());
+
+			int successCount = 0;
+			int failureCount = 0;
+			for (var knowledge : pendingKnowledge) {
+				try {
+					businessKnowledgeService.retryEmbedding(knowledge.getId());
+					successCount++;
+				}
+				catch (Exception e) {
+					failureCount++;
+					log.error("Failed to auto-embed business knowledge id={}: {}", knowledge.getId(), e.getMessage());
+				}
+			}
+
+			log.info("Business knowledge auto-embedding completed. Success: {}, Failed: {}", successCount,
+					failureCount);
+		}
+		catch (Exception e) {
+			log.error("Error during pending business knowledge auto-embedding", e);
+		}
+	}
+
+	/**
+	 * Auto-embed PENDING agent knowledge records on startup.
+	 * <p>
+	 * Agent knowledge embedding is async (event-driven via
+	 * {@code AgentKnowledgeEmbeddingEvent}), so this method only triggers the embedding
+	 * by publishing events. The actual embedding happens in the background via
+	 * {@code AgentKnowledgeEventListener}.
+	 */
+	private void embedPendingAgentKnowledge() {
+		try {
+			var pendingKnowledge = agentKnowledgeMapper.selectPendingAndRecalled();
+
+			if (pendingKnowledge.isEmpty()) {
+				log.info("No pending agent knowledge to embed");
+				return;
+			}
+
+			log.info("Found {} pending agent knowledge records, starting auto-embedding...",
+					pendingKnowledge.size());
+
+			int successCount = 0;
+			int failureCount = 0;
+			for (var knowledge : pendingKnowledge) {
+				try {
+					agentKnowledgeService.retryEmbedding(knowledge.getId());
+					successCount++;
+				}
+				catch (Exception e) {
+					failureCount++;
+					log.error("Failed to auto-embed agent knowledge id={}: {}", knowledge.getId(), e.getMessage());
+				}
+			}
+
+			log.info("Agent knowledge auto-embedding triggered. Success: {}, Failed: {}", successCount, failureCount);
+		}
+		catch (Exception e) {
+			log.error("Error during pending agent knowledge auto-embedding", e);
 		}
 	}
 
