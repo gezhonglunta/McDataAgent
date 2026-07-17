@@ -27,6 +27,13 @@ public interface LlmService {
 
 	Flux<ChatResponse> callUser(String user);
 
+	/**
+	 * Call the model with Spring AI's structured-output validation advisor. The advisor
+	 * validates the response against the schema derived from {@code outputType} and asks
+	 * the model to repair invalid output.
+	 */
+	Flux<ChatResponse> callUser(String user, Class<?> outputType);
+
 	@Deprecated
 	default String blockToString(Flux<ChatResponse> responseFlux) {
 		return toStringFlux(responseFlux).collect(StringBuilder::new, StringBuilder::append)

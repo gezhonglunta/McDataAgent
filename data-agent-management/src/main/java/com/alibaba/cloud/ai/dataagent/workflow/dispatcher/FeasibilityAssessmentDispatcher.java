@@ -15,6 +15,8 @@
  */
 package com.alibaba.cloud.ai.dataagent.workflow.dispatcher;
 
+import com.alibaba.cloud.ai.dataagent.dto.prompt.FeasibilityAssessmentOutputDTO;
+import com.alibaba.cloud.ai.dataagent.util.StateUtil;
 import com.alibaba.cloud.ai.graph.OverAllState;
 import com.alibaba.cloud.ai.graph.action.EdgeAction;
 import lombok.extern.slf4j.Slf4j;
@@ -28,13 +30,15 @@ public class FeasibilityAssessmentDispatcher implements EdgeAction {
 
 	@Override
 	public String apply(OverAllState state) throws Exception {
-		// value的值是和 resources/feasibility-assessment.txt的输出一致，例如
-		// 【需求类型】：《数据分析》
-		// 【语种类型】：《中文》
-		// 【需求内容】：查询所有“核心用户”的数量
-		String value = state.value(FEASIBILITY_ASSESSMENT_NODE_OUTPUT, END);
+		if (state.value(FEASIBILITY_ASSESSMENT_NODE_OUTPUT).isEmpty()) {
+			log.warn("Feasibility assessment result is missing, returning END");
+			return END;
+		}
+		FeasibilityAssessmentOutputDTO result = StateUtil.getObjectValue(state, FEASIBILITY_ASSESSMENT_NODE_OUTPUT,
+				FeasibilityAssessmentOutputDTO.class);
 
-		if (value != null && value.contains("【需求类型】：《数据分析》")) {
+		if (result != null
+				&& result.getRequirementType() == FeasibilityAssessmentOutputDTO.RequirementType.DATA_ANALYSIS) {
 			log.info("[FeasibilityAssessmentNodeDispatcher]需求类型为数据分析，进入PlannerNode节点");
 			return PLANNER_NODE;
 		}

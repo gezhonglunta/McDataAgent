@@ -20,6 +20,7 @@ import com.alibaba.cloud.ai.dataagent.service.graph.Context.MultiTurnContextMana
 import com.alibaba.cloud.ai.dataagent.service.langfuse.LangfuseService;
 import com.alibaba.cloud.ai.dataagent.vo.GraphNodeResponse;
 import com.alibaba.cloud.ai.graph.CompiledGraph;
+import com.alibaba.cloud.ai.graph.CompileConfig;
 import com.alibaba.cloud.ai.graph.OverAllState;
 import com.alibaba.cloud.ai.graph.RunnableConfig;
 import com.alibaba.cloud.ai.graph.StateGraph;
@@ -72,7 +73,9 @@ class GraphServiceImplTest {
 		StateGraph mockStateGraph = mock(StateGraph.class);
 		when(mockStateGraph.compile(any())).thenReturn(compiledGraph);
 
-		graphService = new GraphServiceImpl(mockStateGraph, executor, multiTurnContextManager, langfuseReporter);
+		CompileConfig compileConfig = CompileConfig.builder().build();
+		graphService = new GraphServiceImpl(mockStateGraph, compileConfig, executor, multiTurnContextManager,
+				langfuseReporter);
 
 		when(langfuseReporter.startLLMSpan(anyString(), any())).thenReturn(mockSpan);
 		when(mockSpan.isRecording()).thenReturn(true);

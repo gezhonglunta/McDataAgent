@@ -17,6 +17,7 @@ package com.alibaba.cloud.ai.dataagent.workflow.node;
 
 import static com.alibaba.cloud.ai.dataagent.constant.Constant.*;
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -79,14 +80,14 @@ class FeasibilityAssessmentNodeTest {
 		state.updateState(Map.of(QUERY_ENHANCE_NODE_OUTPUT, dto, TABLE_RELATION_OUTPUT, createSimpleSchema(), EVIDENCE,
 				"用户表有id, name字段"));
 
-		when(llmService.callUser(anyString()))
-			.thenReturn(Flux.just(ChatResponseUtil.createPureResponse("可行：可以通过SQL查询用户数量")));
+		when(llmService.callUser(anyString(), any())).thenReturn(Flux.just(ChatResponseUtil.createPureResponse(
+				"{\"requirementType\":\"DATA_ANALYSIS\",\"language\":\"zh-CN\",\"content\":\"查询用户数量\"}")));
 
 		Map<String, Object> result = feasibilityAssessmentNode.apply(state);
 
 		assertNotNull(result);
 		assertTrue(result.containsKey(FEASIBILITY_ASSESSMENT_NODE_OUTPUT));
-		verify(llmService).callUser(anyString());
+		verify(llmService).callUser(anyString(), any());
 	}
 
 	@Test
@@ -96,8 +97,8 @@ class FeasibilityAssessmentNodeTest {
 		state.updateState(
 				Map.of(QUERY_ENHANCE_NODE_OUTPUT, dto, TABLE_RELATION_OUTPUT, createSimpleSchema(), EVIDENCE, "无相关数据"));
 
-		when(llmService.callUser(anyString()))
-			.thenReturn(Flux.just(ChatResponseUtil.createPureResponse("不可行：该查询与数据库无关")));
+		when(llmService.callUser(anyString(), any())).thenReturn(Flux.just(ChatResponseUtil.createPureResponse(
+				"{\"requirementType\":\"FREE_CHAT\",\"language\":\"zh-CN\",\"content\":\"查询与数据库无关\"}")));
 
 		Map<String, Object> result = feasibilityAssessmentNode.apply(state);
 
@@ -112,7 +113,8 @@ class FeasibilityAssessmentNodeTest {
 		state.updateState(Map.of(QUERY_ENHANCE_NODE_OUTPUT, dto, TABLE_RELATION_OUTPUT, createSimpleSchema(), EVIDENCE,
 				"evidence", MULTI_TURN_CONTEXT, "之前查询了用户列表"));
 
-		when(llmService.callUser(anyString())).thenReturn(Flux.just(ChatResponseUtil.createPureResponse("可行")));
+		when(llmService.callUser(anyString(), any())).thenReturn(Flux.just(ChatResponseUtil.createPureResponse(
+				"{\"requirementType\":\"DATA_ANALYSIS\",\"language\":\"zh-CN\",\"content\":\"查询用户订单\"}")));
 
 		Map<String, Object> result = feasibilityAssessmentNode.apply(state);
 
@@ -127,8 +129,9 @@ class FeasibilityAssessmentNodeTest {
 		state.updateState(Map.of(QUERY_ENHANCE_NODE_OUTPUT, dto, TABLE_RELATION_OUTPUT, createSimpleSchema(), EVIDENCE,
 				"sales table exists"));
 
-		when(llmService.callUser(anyString())).thenReturn(Flux.just(ChatResponseUtil.createPureResponse("可行："),
-				ChatResponseUtil.createPureResponse("可以查询销售额数据")));
+		when(llmService.callUser(anyString(), any())).thenReturn(Flux.just(
+				ChatResponseUtil.createPureResponse("{\"requirementType\":\"DATA_ANALYSIS\",\"language\":\"zh-CN\","),
+				ChatResponseUtil.createPureResponse("\"content\":\"查询销售额\"}")));
 
 		Map<String, Object> result = feasibilityAssessmentNode.apply(state);
 

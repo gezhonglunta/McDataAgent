@@ -18,6 +18,14 @@ package com.alibaba.cloud.ai.dataagent.config;
 import com.alibaba.cloud.ai.dataagent.properties.CodeExecutorProperties;
 import com.alibaba.cloud.ai.dataagent.properties.DataAgentProperties;
 import com.alibaba.cloud.ai.dataagent.properties.FileStorageProperties;
+import com.alibaba.cloud.ai.dataagent.properties.OssStorageProperties;
+import com.alibaba.cloud.ai.dataagent.service.code.CodePoolExecutorService;
+import com.alibaba.cloud.ai.dataagent.service.code.CodePoolExecutorServiceFactory;
+import com.alibaba.cloud.ai.dataagent.service.code.docker.DockerExecutorFactory;
+import com.alibaba.cloud.ai.dataagent.service.file.FileStorageService;
+import com.alibaba.cloud.ai.dataagent.service.file.FileStorageServiceFactory;
+import com.alibaba.cloud.ai.dataagent.service.llm.LlmService;
+import com.alibaba.cloud.ai.dataagent.service.llm.LlmServiceFactory;
 import com.alibaba.cloud.ai.dataagent.service.vectorstore.SimpleVectorStoreInitialization;
 import com.alibaba.cloud.ai.dataagent.splitter.SentenceSplitter;
 import com.alibaba.cloud.ai.transformer.splitter.RecursiveCharacterTextSplitter;
@@ -29,15 +37,22 @@ import com.alibaba.cloud.ai.dataagent.service.aimodelconfig.AiModelRegistry;
 import com.alibaba.cloud.ai.dataagent.strategy.EnhancedTokenCountBatchingStrategy;
 import com.alibaba.cloud.ai.dataagent.workflow.dispatcher.*;
 import com.alibaba.cloud.ai.dataagent.workflow.node.*;
+import com.alibaba.cloud.ai.graph.CompileConfig;
 import com.alibaba.cloud.ai.graph.GraphRepresentation;
 import com.alibaba.cloud.ai.graph.KeyStrategy;
 import com.alibaba.cloud.ai.graph.KeyStrategyFactory;
 import com.alibaba.cloud.ai.graph.StateGraph;
+import com.alibaba.cloud.ai.graph.checkpoint.config.SaverConfig;
+import com.alibaba.cloud.ai.graph.checkpoint.savers.mysql.CreateOption;
+import com.alibaba.cloud.ai.graph.checkpoint.savers.mysql.MysqlSaver;
 import com.alibaba.cloud.ai.graph.exception.GraphStateException;
 import com.knuddels.jtokkit.api.EncodingType;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.embedding.BatchingStrategy;
 import org.springframework.ai.embedding.EmbeddingModel;
+import org.springframework.ai.chat.memory.ChatMemory;
+import org.springframework.ai.chat.memory.ChatMemoryRepository;
+import org.springframework.ai.chat.memory.MessageWindowChatMemory;
 import org.springframework.ai.tool.ToolCallback;
 import org.springframework.ai.tool.ToolCallbackProvider;
 import org.springframework.ai.tool.resolution.DelegatingToolCallbackResolver;
@@ -67,6 +82,7 @@ import org.springframework.scheduling.annotation.EnableAsync;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.netty.http.client.HttpClient;
 
+import javax.sql.DataSource;
 import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.*;
@@ -93,6 +109,23 @@ public class DataAgentConfiguration implements DisposableBean {
 	 * 专用线程池，用于数据库操作的并行处理
 	 */
 	private ExecutorService dbOperationExecutor;
+
+	@Bean
+	public LlmService llmService(DataAgentProperties properties, AiModelRegistry aiModelRegistry) {
+		return new LlmServiceFactory(properties, aiModelRegistry).getObject();
+	}
+
+	@Bean
+	public FileStorageService fileStorageService(FileStorageProperties properties,
+			OssStorageProperties ossStorageProperties) {
+		return new FileStorageServiceFactory(properties, ossStorageProperties).getObject();
+	}
+
+	@Bean
+	public CodePoolExecutorService codePoolExecutorService(CodeExecutorProperties properties, LlmService llmService,
+			DockerExecutorFactory dockerExecutorFactory) {
+		return new CodePoolExecutorServiceFactory(properties, llmService, dockerExecutorFactory).getObject();
+	}
 
 	@Bean
 	@ConditionalOnMissingBean(RestClientCustomizer.class)
@@ -260,6 +293,33 @@ public class DataAgentConfiguration implements DisposableBean {
 		log.info("workflow in PlantUML format as follows \n\n" + graphRepresentation.content() + "\n\n");
 
 		return stateGraph;
+	}
+
+	/**
+	 * Compile configuration for the NL2SQL graph. Spring AI Alibaba owns checkpoint
+	 * serialization and persistence; application code only supplies the business
+	 * datasource and the human-review interruption point.
+	 */
+	@Bean
+	public CompileConfig nl2sqlGraphCompileConfig(StateGraph nl2sqlGraph, DataSource dataSource) {
+		MysqlSaver checkpointSaver = MysqlSaver.builder()
+			.dataSource(dataSource)
+			.stateSerializer(nl2sqlGraph.getStateSerializer())
+			.createOption(CreateOption.CREATE_IF_NOT_EXISTS)
+			.build();
+
+		SaverConfig saverConfig = SaverConfig.builder().register(checkpointSaver).build();
+		return CompileConfig.builder().saverConfig(saverConfig).interruptBefore(HUMAN_FEEDBACK_NODE).build();
+	}
+
+	@Bean
+	@ConditionalOnMissingBean(ChatMemory.class)
+	public ChatMemory chatMemory(ChatMemoryRepository chatMemoryRepository, DataAgentProperties properties) {
+		int maxMessages = Math.max(2, properties.getMaxturnhistory() * 2);
+		return MessageWindowChatMemory.builder()
+			.chatMemoryRepository(chatMemoryRepository)
+			.maxMessages(maxMessages)
+			.build();
 	}
 
 	/**

@@ -133,6 +133,20 @@ class GraphService {
 
     let isCompleted = false;
 
+    eventSource.addEventListener("error", async (event) => {
+      if (!(event instanceof MessageEvent) || !event.data || isCompleted) return;
+      isCompleted = true;
+      eventSource.close();
+      try {
+        const response = JSON.parse(event.data) as GraphNodeResponse;
+        if (onError) {
+          await onError(new Error(response.text || "Stream processing failed"));
+        }
+      } catch {
+        if (onError) await onError(new Error("Stream processing failed"));
+      }
+    });
+
     eventSource.onerror = async (_error) => {
       // If already completed or the connection was intentionally closed, ignore
       if (isCompleted) {

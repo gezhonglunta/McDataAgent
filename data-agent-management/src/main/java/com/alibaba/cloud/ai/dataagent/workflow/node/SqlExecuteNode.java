@@ -16,6 +16,7 @@
 package com.alibaba.cloud.ai.dataagent.workflow.node;
 
 import static com.alibaba.cloud.ai.dataagent.constant.Constant.PLAN_CURRENT_STEP;
+import static com.alibaba.cloud.ai.dataagent.constant.Constant.IS_ONLY_NL2SQL;
 import static com.alibaba.cloud.ai.dataagent.constant.Constant.SQL_EXECUTE_NODE_OUTPUT;
 import static com.alibaba.cloud.ai.dataagent.constant.Constant.SQL_GENERATE_COUNT;
 import static com.alibaba.cloud.ai.dataagent.constant.Constant.SQL_GENERATE_OUTPUT;
@@ -212,12 +213,14 @@ public class SqlExecuteNode implements NodeAction {
 	 * @param resultSetBO SQL执行结果
 	 */
 	private DisplayStyleBO enrichResultSetWithChartConfig(OverAllState state, ResultSetBO resultSetBO) {
-		// 创建ResultDisplayStyleBO对象
-		DisplayStyleBO displayStyle = new DisplayStyleBO();
+		DisplayStyleBO defaultDisplayStyle = tableDisplayStyle();
+		if (state.value(IS_ONLY_NL2SQL, false)) {
+			log.debug("NL2SQL-only mode skips optional chart generation and uses table display");
+			return defaultDisplayStyle;
+		}
 		if (!this.properties.isEnableSqlResultChart()) {
 			log.debug("Sql result chart is disabled, set display style as table default");
-			displayStyle.setType("table");
-			return displayStyle;
+			return defaultDisplayStyle;
 		}
 
 		try {
@@ -256,7 +259,7 @@ public class SqlExecuteNode implements NodeAction {
 				.block(Duration.ofMillis(properties.getEnrichSqlResultTimeout()));
 			if (chartConfigJson != null && !chartConfigJson.trim().isEmpty()) {
 				String content = MarkdownParserUtil.extractText(chartConfigJson.trim());
-				displayStyle = jsonParseUtil.tryConvertToObject(content, DisplayStyleBO.class);
+				DisplayStyleBO displayStyle = jsonParseUtil.tryConvertToObject(content, DisplayStyleBO.class);
 				log.debug("Successfully enriched ResultSetBO with chart config: type={}, title={}, x={}, y={}",
 						displayStyle.getType(), displayStyle.getTitle(), displayStyle.getX(), displayStyle.getY());
 				return displayStyle;
@@ -266,10 +269,15 @@ public class SqlExecuteNode implements NodeAction {
 			}
 		}
 		catch (Exception e) {
-			log.error("Failed to enrich ResultSetBO with chart config", e);
-			// 不抛出异常，允许流程继续执行
+			log.warn("Failed to generate optional chart config, using table display: {}", e.getMessage());
 		}
-		return null;
+		return defaultDisplayStyle;
+	}
+
+	private DisplayStyleBO tableDisplayStyle() {
+		DisplayStyleBO displayStyle = new DisplayStyleBO();
+		displayStyle.setType("table");
+		return displayStyle;
 	}
 
 }

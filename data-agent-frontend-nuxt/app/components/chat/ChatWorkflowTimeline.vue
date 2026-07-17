@@ -71,16 +71,8 @@
 						class="step-content"
 						:class="{ 'is-muted': step.status === 'done' && !step.isReport }"
 					>
-						<!-- Result Set -->
-						<ChatResultSet
-							v-if="
-								step.block[0]?.textType === 'RESULT_SET' && step.block[0]?.text && store.requestOptions.showSqlResults
-							"
-							:data="safeParseJson(step.block[0].text)"
-							:page-size="10"
-						/>
 						<!-- Report node: show brief status, not full content -->
-						<div v-else-if="step.isReport" class="text-body report-brief">
+						<div v-if="step.isReport" class="text-body report-brief">
 							<v-icon size="14" color="#16a34a" class="mr-1"
 								>mdi-file-chart-outline</v-icon
 							>
@@ -91,14 +83,20 @@
 						</div>
 						<!-- Pure code block (all items share same code type) -->
 						<div
-							v-else-if="isPureCodeBlock(step.block)"
-							v-html="renderCode(step.block)"
+							v-else-if="isPureCodeBlock(step.contentBlock)"
+							v-html="renderCode(step.contentBlock)"
 						/>
 						<!-- Mixed content: text with possible embedded JSON/code -->
 						<div
-							v-else
+							v-else-if="step.contentBlock.length"
 							class="text-body"
-							v-html="renderTextWithJsonDetection(step.block)"
+							v-html="renderTextWithJsonDetection(step.contentBlock)"
+						/>
+						<!-- RESULT_SET arrives as another block from the same node. -->
+						<ChatResultSet
+							v-if="step.resultSetText && store.requestOptions.showSqlResults"
+							:data="safeParseJson(step.resultSetText)"
+							:page-size="10"
 						/>
 					</div>
 				</v-expand-transition>
@@ -108,10 +106,10 @@
 </template>
 
 <script setup lang="ts">
-import hljs from 'highlight.js';
 import DOMPurify from 'dompurify';
 import { useEchartsRenderer } from '~/composables/useEchartsRenderer';
-import type { GraphNodeResponse } from '~/services/graph/index';
+import { hljs } from '~/utils/markdown/markdown-plugin-highlight';
+import { TextType, type GraphNodeResponse } from '~/services/graph/index';
 import type { ResultData } from '~/services/resultSet/index';
 import ChatResultSet from './ChatResultSet.vue';
 import { useChatStore } from '~/stores/chat';
@@ -247,7 +245,8 @@ const NODE_LABEL_MAP: Record<string, NodeDef> = {
 
 interface TimelineStep extends NodeDef {
 	status: 'pending' | 'active' | 'done';
-	block: GraphNodeResponse[];
+	contentBlock: GraphNodeResponse[];
+	resultSetText?: string;
 	expanded: boolean;
 	isReport: boolean;
 }
@@ -272,8 +271,15 @@ const timelineSteps = computed<TimelineStep[]>(() => {
 			label: nodeName,
 			icon: 'mdi-lightning-bolt',
 		};
-		const block =
-			props.nodeBlocks.find((b) => b[0]?.nodeName === nodeName) || [];
+		const block = props.nodeBlocks
+			.filter((candidate) => candidate[0]?.nodeName === nodeName)
+			.flat();
+		const contentBlock = block.filter(
+			(item) => item.textType !== TextType.RESULT_SET,
+		);
+		const resultSetText = block.find(
+			(item) => item.textType === TextType.RESULT_SET && item.text,
+		)?.text;
 		const isReport = nodeName === 'ReportGeneratorNode';
 
 		let status: 'pending' | 'active' | 'done' = 'pending';
@@ -286,7 +292,8 @@ const timelineSteps = computed<TimelineStep[]>(() => {
 		return {
 			...def,
 			status,
-			block,
+			contentBlock,
+			resultSetText,
 			expanded: expandedSteps.value[nodeName] ?? getDefaultExpanded(nodeName),
 			isReport,
 		};

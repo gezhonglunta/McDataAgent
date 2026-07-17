@@ -47,6 +47,31 @@ export interface ChatRequestOptions {
 	pageSize: number;
 }
 
+function extractIntentReply(blocks: GraphNodeResponse[][]): string | null {
+	const json = blocks
+		.flat()
+		.filter(
+			(item) =>
+				item.nodeName === 'IntentRecognitionNode' &&
+				item.textType === TextType.JSON,
+		)
+		.map((item) => item.text)
+		.join('')
+		.trim();
+	if (!json) return null;
+
+	try {
+		const result = JSON.parse(json) as {
+			classification?: string;
+			response?: string;
+		};
+		if (result.classification !== '《闲聊或无关指令》') return null;
+		return result.response?.trim() || null;
+	} catch {
+		return null;
+	}
+}
+
 export const useChatStore = defineStore('chat', () => {
 	// ── Session list state ──────────────────────────────────────────────────────
 	const sessions = ref<ExtendedChatSession[]>([]);
@@ -308,7 +333,9 @@ export const useChatStore = defineStore('chat', () => {
 			nl2sqlOnly: requestOptions.value.nl2sqlOnly,
 			rejectedPlan: false,
 			humanFeedbackContent: undefined,
-			threadId: sessionState.lastRequest?.threadId,
+			// Keep one stable graph thread per chat session so Spring AI Alibaba can
+			// restore checkpoints and Spring AI can restore chat memory after reloads.
+			threadId: sessionState.lastRequest?.threadId || currentSession.value.id,
 		};
 
 		await _sendGraphRequest(request, true);
@@ -499,6 +526,7 @@ export const useChatStore = defineStore('chat', () => {
 			},
 			async () => {
 				flushPendingSync();
+				const intentReply = extractIntentReply(sessionState.nodeBlocks);
 
 				if (sessionState.nodeBlocks.length > 0) {
 					const timelineMsg: ChatMessage = {
@@ -515,6 +543,18 @@ export const useChatStore = defineStore('chat', () => {
 						});
 					if (savedTimeline && currentSession.value?.id === sessionId)
 						currentMessages.value.push(savedTimeline);
+				}
+
+				if (intentReply) {
+					const replyMessage: ChatMessage = {
+						sessionId,
+						role: 'assistant',
+						content: intentReply,
+						messageType: 'text',
+					};
+					await chatService
+						.saveMessage(sessionId, replyMessage)
+						.catch((e) => console.error(e));
 				}
 
 				if (requestOptions.value.humanFeedback && _rejectedPlan) {

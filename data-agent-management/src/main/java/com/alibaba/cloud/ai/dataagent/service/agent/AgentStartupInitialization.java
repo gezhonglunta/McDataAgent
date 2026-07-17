@@ -18,8 +18,10 @@ package com.alibaba.cloud.ai.dataagent.service.agent;
 import com.alibaba.cloud.ai.dataagent.entity.Agent;
 import com.alibaba.cloud.ai.dataagent.entity.AgentDatasource;
 import com.alibaba.cloud.ai.dataagent.enums.EmbeddingStatus;
+import com.alibaba.cloud.ai.dataagent.enums.ModelType;
 import com.alibaba.cloud.ai.dataagent.mapper.AgentKnowledgeMapper;
 import com.alibaba.cloud.ai.dataagent.mapper.BusinessKnowledgeMapper;
+import com.alibaba.cloud.ai.dataagent.service.aimodelconfig.ModelConfigDataService;
 import com.alibaba.cloud.ai.dataagent.service.business.BusinessKnowledgeService;
 import com.alibaba.cloud.ai.dataagent.service.datasource.AgentDatasourceService;
 import com.alibaba.cloud.ai.dataagent.service.knowledge.AgentKnowledgeService;
@@ -53,6 +55,8 @@ public class AgentStartupInitialization implements ApplicationRunner, Disposable
 
 	private final AgentKnowledgeMapper agentKnowledgeMapper;
 
+	private final ModelConfigDataService modelConfigDataService;
+
 	private final ExecutorService executorService;
 
 	@Override
@@ -63,6 +67,10 @@ public class AgentStartupInitialization implements ApplicationRunner, Disposable
 			// 因为异步可以让初始化过程在后台运行，不会阻塞Spring启动主线程，提高启动速度和响应性；即使初始化很耗时也不会影响主程序正常启动。
 			CompletableFuture.runAsync(() -> {
 				initializePublishedAgents();
+				if (!hasActiveEmbeddingModel()) {
+					log.warn("No active EMBEDDING model configured; pending knowledge will remain pending");
+					return;
+				}
 				embedPendingBusinessKnowledge();
 				embedPendingAgentKnowledge();
 			}, executorService).exceptionally(throwable -> {
@@ -73,6 +81,16 @@ public class AgentStartupInitialization implements ApplicationRunner, Disposable
 		}
 		catch (Exception e) {
 			log.error("Failed to start agent initialization process", e);
+		}
+	}
+
+	private boolean hasActiveEmbeddingModel() {
+		try {
+			return modelConfigDataService.getActiveConfigByType(ModelType.EMBEDDING) != null;
+		}
+		catch (Exception e) {
+			log.warn("Unable to inspect active EMBEDDING model; skipping startup embedding: {}", e.getMessage());
+			return false;
 		}
 	}
 
@@ -249,8 +267,7 @@ public class AgentStartupInitialization implements ApplicationRunner, Disposable
 				return;
 			}
 
-			log.info("Found {} pending agent knowledge records, starting auto-embedding...",
-					pendingKnowledge.size());
+			log.info("Found {} pending agent knowledge records, starting auto-embedding...", pendingKnowledge.size());
 
 			int successCount = 0;
 			int failureCount = 0;

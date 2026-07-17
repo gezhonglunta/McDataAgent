@@ -15,6 +15,7 @@
  */
 package com.alibaba.cloud.ai.dataagent.workflow.dispatcher;
 
+import com.alibaba.cloud.ai.dataagent.dto.prompt.FeasibilityAssessmentOutputDTO;
 import com.alibaba.cloud.ai.graph.OverAllState;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -37,7 +38,8 @@ class FeasibilityAssessmentDispatcherTest {
 	@Test
 	void apply_dataAnalysisOutput_routesToPlannerNode() throws Exception {
 		OverAllState state = new OverAllState();
-		state.updateState(Map.of(FEASIBILITY_ASSESSMENT_NODE_OUTPUT, "【需求类型】：《数据分析》\n用户需要查询PV数据"));
+		state.updateState(Map.of(FEASIBILITY_ASSESSMENT_NODE_OUTPUT,
+				result(FeasibilityAssessmentOutputDTO.RequirementType.DATA_ANALYSIS)));
 
 		assertEquals(PLANNER_NODE, dispatcher.apply(state));
 	}
@@ -45,7 +47,8 @@ class FeasibilityAssessmentDispatcherTest {
 	@Test
 	void apply_nonDataAnalysisOutput_routesToEnd() throws Exception {
 		OverAllState state = new OverAllState();
-		state.updateState(Map.of(FEASIBILITY_ASSESSMENT_NODE_OUTPUT, "【需求类型】：《闲聊》"));
+		state.updateState(Map.of(FEASIBILITY_ASSESSMENT_NODE_OUTPUT,
+				result(FeasibilityAssessmentOutputDTO.RequirementType.FREE_CHAT)));
 
 		assertEquals(END, dispatcher.apply(state));
 	}
@@ -57,12 +60,10 @@ class FeasibilityAssessmentDispatcherTest {
 		assertEquals(END, dispatcher.apply(state));
 	}
 
-	@Test
-	void apply_emptyOutput_routesToEnd() throws Exception {
-		OverAllState state = new OverAllState();
-		state.updateState(Map.of(FEASIBILITY_ASSESSMENT_NODE_OUTPUT, ""));
-
-		assertEquals(END, dispatcher.apply(state));
+	private FeasibilityAssessmentOutputDTO result(FeasibilityAssessmentOutputDTO.RequirementType type) {
+		FeasibilityAssessmentOutputDTO result = new FeasibilityAssessmentOutputDTO();
+		result.setRequirementType(type);
+		return result;
 	}
 
 }

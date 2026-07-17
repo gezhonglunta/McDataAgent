@@ -18,6 +18,7 @@ package com.alibaba.cloud.ai.dataagent.workflow.node;
 import static com.alibaba.cloud.ai.dataagent.constant.Constant.*;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -34,7 +35,6 @@ import org.mockito.quality.Strictness;
 import com.alibaba.cloud.ai.dataagent.enums.TextType;
 import com.alibaba.cloud.ai.dataagent.service.llm.LlmService;
 import com.alibaba.cloud.ai.dataagent.util.ChatResponseUtil;
-import com.alibaba.cloud.ai.dataagent.util.JsonParseUtil;
 import com.alibaba.cloud.ai.graph.OverAllState;
 import com.alibaba.cloud.ai.graph.state.strategy.ReplaceStrategy;
 
@@ -48,22 +48,19 @@ class IntentRecognitionNodeTest {
 
 	private static final String JSON_ANALYSIS = """
 			{
-				"intent": "data_analysis",
-				"confidence": 0.95
+				"classification": "《可能的数据分析请求》",
+				"response": ""
 			}
 			""";
 
 	@Mock
 	private LlmService llmService;
 
-	@Mock
-	private JsonParseUtil jsonParseUtil;
-
 	private IntentRecognitionNode intentRecognitionNode;
 
 	@BeforeEach
 	void setUp() {
-		intentRecognitionNode = new IntentRecognitionNode(llmService, jsonParseUtil);
+		intentRecognitionNode = new IntentRecognitionNode(llmService);
 	}
 
 	private OverAllState createTestState() {
@@ -79,11 +76,12 @@ class IntentRecognitionNodeTest {
 		OverAllState state = createTestState();
 		state.updateState(Map.of(INPUT_KEY, CHAT_QUERY, MULTI_TURN_CONTEXT, "(无)"));
 
-		when(llmService.callUser(any())).thenReturn(Flux.just(ChatResponseUtil.createResponse("正在进行意图识别..."),
-				ChatResponseUtil.createPureResponse(TextType.JSON.getStartSign()),
-				ChatResponseUtil.createPureResponse(JSON_ANALYSIS),
-				ChatResponseUtil.createPureResponse(TextType.JSON.getEndSign()),
-				ChatResponseUtil.createResponse("\n意图识别完成！")));
+		when(llmService.callUser(anyString(), any()))
+			.thenReturn(Flux.just(ChatResponseUtil.createResponse("正在进行意图识别..."),
+					ChatResponseUtil.createPureResponse(TextType.JSON.getStartSign()),
+					ChatResponseUtil.createPureResponse(JSON_ANALYSIS),
+					ChatResponseUtil.createPureResponse(TextType.JSON.getEndSign()),
+					ChatResponseUtil.createResponse("\n意图识别完成！")));
 
 		Map<String, Object> result = intentRecognitionNode.apply(state);
 
@@ -96,15 +94,16 @@ class IntentRecognitionNodeTest {
 		OverAllState state = createTestState();
 		state.updateState(Map.of(INPUT_KEY, "你好", MULTI_TURN_CONTEXT, "(无)"));
 
-		when(llmService.callUser(any())).thenReturn(Flux.just(ChatResponseUtil.createResponse("正在进行意图识别..."),
-				ChatResponseUtil.createPureResponse(TextType.JSON.getStartSign()),
-				ChatResponseUtil.createPureResponse("""
-						{
-							"intent": "chat",
-							"confidence": 0.98
-						}
-						"""), ChatResponseUtil.createPureResponse(TextType.JSON.getEndSign()),
-				ChatResponseUtil.createResponse("\n意图识别完成！")));
+		when(llmService.callUser(anyString(), any()))
+			.thenReturn(Flux.just(ChatResponseUtil.createResponse("正在进行意图识别..."),
+					ChatResponseUtil.createPureResponse(TextType.JSON.getStartSign()),
+					ChatResponseUtil.createPureResponse("""
+							{
+								"classification": "《闲聊或无关指令》",
+								"response": "你好！我可以帮你分析已连接的数据。"
+							}
+							"""), ChatResponseUtil.createPureResponse(TextType.JSON.getEndSign()),
+					ChatResponseUtil.createResponse("\n意图识别完成！")));
 
 		Map<String, Object> result = intentRecognitionNode.apply(state);
 
@@ -124,11 +123,12 @@ class IntentRecognitionNodeTest {
 		OverAllState state = createTestState();
 		state.updateState(Map.of(INPUT_KEY, CHAT_QUERY, MULTI_TURN_CONTEXT, "(无)"));
 
-		when(llmService.callUser(any())).thenReturn(Flux.just(ChatResponseUtil.createResponse("正在进行意图识别..."),
-				ChatResponseUtil.createPureResponse(TextType.JSON.getStartSign()),
-				ChatResponseUtil.createPureResponse("invalid json"),
-				ChatResponseUtil.createPureResponse(TextType.JSON.getEndSign()),
-				ChatResponseUtil.createResponse("\n意图识别完成！")));
+		when(llmService.callUser(anyString(), any()))
+			.thenReturn(Flux.just(ChatResponseUtil.createResponse("正在进行意图识别..."),
+					ChatResponseUtil.createPureResponse(TextType.JSON.getStartSign()),
+					ChatResponseUtil.createPureResponse("invalid json"),
+					ChatResponseUtil.createPureResponse(TextType.JSON.getEndSign()),
+					ChatResponseUtil.createResponse("\n意图识别完成！")));
 
 		Map<String, Object> result = intentRecognitionNode.apply(state);
 		assertNotNull(result);
@@ -140,7 +140,7 @@ class IntentRecognitionNodeTest {
 		OverAllState state = createTestState();
 		state.updateState(Map.of(INPUT_KEY, CHAT_QUERY, MULTI_TURN_CONTEXT, "(无)"));
 
-		when(llmService.callUser(any())).thenThrow(new RuntimeException("LLM service unavailable"));
+		when(llmService.callUser(anyString(), any())).thenThrow(new RuntimeException("LLM service unavailable"));
 
 		assertThrows(RuntimeException.class, () -> intentRecognitionNode.apply(state));
 	}
@@ -151,18 +151,19 @@ class IntentRecognitionNodeTest {
 		String context = "user: 查询PV，assistant: 已提供数据";
 		state.updateState(Map.of(INPUT_KEY, CHAT_QUERY, MULTI_TURN_CONTEXT, context));
 
-		when(llmService.callUser(any())).thenReturn(Flux.just(ChatResponseUtil.createResponse("正在进行意图识别..."),
-				ChatResponseUtil.createPureResponse(TextType.JSON.getStartSign()),
-				ChatResponseUtil.createPureResponse(JSON_ANALYSIS),
-				ChatResponseUtil.createPureResponse(TextType.JSON.getEndSign()),
-				ChatResponseUtil.createResponse("\n意图识别完成！")));
+		when(llmService.callUser(anyString(), any()))
+			.thenReturn(Flux.just(ChatResponseUtil.createResponse("正在进行意图识别..."),
+					ChatResponseUtil.createPureResponse(TextType.JSON.getStartSign()),
+					ChatResponseUtil.createPureResponse(JSON_ANALYSIS),
+					ChatResponseUtil.createPureResponse(TextType.JSON.getEndSign()),
+					ChatResponseUtil.createResponse("\n意图识别完成！")));
 
 		Map<String, Object> result = intentRecognitionNode.apply(state);
 
 		assertNotNull(result);
 		assertTrue(result.containsKey(INTENT_RECOGNITION_NODE_OUTPUT));
 
-		verify(llmService).callUser(any());
+		verify(llmService).callUser(anyString(), any());
 	}
 
 	@Test
@@ -174,11 +175,12 @@ class IntentRecognitionNodeTest {
 		}
 		state.updateState(Map.of(INPUT_KEY, longInput.toString(), MULTI_TURN_CONTEXT, "(无)"));
 
-		when(llmService.callUser(any())).thenReturn(Flux.just(ChatResponseUtil.createResponse("正在进行意图识别..."),
-				ChatResponseUtil.createPureResponse(TextType.JSON.getStartSign()),
-				ChatResponseUtil.createPureResponse(JSON_ANALYSIS),
-				ChatResponseUtil.createPureResponse(TextType.JSON.getEndSign()),
-				ChatResponseUtil.createResponse("\n意图识别完成！")));
+		when(llmService.callUser(anyString(), any()))
+			.thenReturn(Flux.just(ChatResponseUtil.createResponse("正在进行意图识别..."),
+					ChatResponseUtil.createPureResponse(TextType.JSON.getStartSign()),
+					ChatResponseUtil.createPureResponse(JSON_ANALYSIS),
+					ChatResponseUtil.createPureResponse(TextType.JSON.getEndSign()),
+					ChatResponseUtil.createResponse("\n意图识别完成！")));
 
 		Map<String, Object> result = intentRecognitionNode.apply(state);
 

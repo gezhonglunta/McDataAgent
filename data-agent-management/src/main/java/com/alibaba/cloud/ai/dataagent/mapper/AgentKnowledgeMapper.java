@@ -113,9 +113,9 @@ public interface AgentKnowledgeMapper {
 	List<Integer> selectRecalledKnowledgeIds(@Param("agentId") Integer agentId);
 
 	/**
-	 * Query all agent knowledge records that are pending embedding and marked for
-	 * recall. Used by startup auto-embedding to fix seed data inserted via data.sql
-	 * with embedding_status='PENDING'.
+	 * Query all agent knowledge records that are pending embedding and marked for recall.
+	 * Used by startup auto-embedding to fix seed data inserted via data.sql with
+	 * embedding_status='PENDING'.
 	 */
 	@Select("""
 			SELECT * FROM agent_knowledge

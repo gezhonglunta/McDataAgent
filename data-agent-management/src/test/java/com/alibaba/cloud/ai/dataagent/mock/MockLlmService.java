@@ -76,4 +76,9 @@ public class MockLlmService implements LlmService {
 		return Flux.just(ChatResponseUtil.createPureResponse(response));
 	}
 
+	@Override
+	public Flux<ChatResponse> callUser(String user, Class<?> outputType) {
+		return callUser(user);
+	}
+
 }

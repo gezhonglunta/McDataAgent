@@ -58,10 +58,10 @@ public class GraphServiceImpl implements GraphService {
 
 	private final LangfuseService langfuseReporter;
 
-	public GraphServiceImpl(StateGraph stateGraph, ExecutorService executorService,
+	public GraphServiceImpl(StateGraph stateGraph, CompileConfig compileConfig, ExecutorService executorService,
 			MultiTurnContextManager multiTurnContextManager, LangfuseService langfuseReporter)
 			throws GraphStateException {
-		this.compiledGraph = stateGraph.compile(CompileConfig.builder().interruptBefore(HUMAN_FEEDBACK_NODE).build());
+		this.compiledGraph = stateGraph.compile(compileConfig);
 		this.executor = executorService;
 		this.multiTurnContextManager = multiTurnContextManager;
 		this.langfuseReporter = langfuseReporter;
