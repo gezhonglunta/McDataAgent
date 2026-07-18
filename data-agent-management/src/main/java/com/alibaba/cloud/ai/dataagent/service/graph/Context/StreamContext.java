@@ -34,6 +34,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 @Data
 public class StreamContext {
 
+	private String conversationId;
+
 	private Disposable disposable;
 
 	private Sinks.Many<ServerSentEvent<GraphNodeResponse>> sink;

@@ -30,6 +30,8 @@ spring:
       type: simple
     alibaba:
       data-agent:
+        checkpoint:
+          type: memory
         vector-store:
           table-topk-limit: 10
           table-similarity-threshold: 0.2

@@ -325,17 +325,17 @@ export const useChatStore = defineStore('chat', () => {
 		);
 		currentMessages.value.push(saved);
 
-		const sessionState = getSessionState(currentSession.value.id);
 		const request: GraphRequest = {
 			agentId: String(currentAgentId.value || ''),
+			conversationId: currentSession.value.id,
 			query,
 			humanFeedback: requestOptions.value.humanFeedback,
 			nl2sqlOnly: requestOptions.value.nl2sqlOnly,
 			rejectedPlan: false,
 			humanFeedbackContent: undefined,
-			// Keep one stable graph thread per chat session so Spring AI Alibaba can
-			// restore checkpoints and Spring AI can restore chat memory after reloads.
-			threadId: sessionState.lastRequest?.threadId || currentSession.value.id,
+			// A normal message starts a fresh graph run. The backend returns its run ID
+			// and submitFeedback reuses it only when resuming an interrupted graph.
+			threadId: undefined,
 		};
 
 		await _sendGraphRequest(request, true);
@@ -570,7 +570,8 @@ export const useChatStore = defineStore('chat', () => {
 				}
 
 				currentNodeName = null;
-				closeStream();
+				await closeStream();
+				sessionState.closeStream = null;
 				if (currentSession.value?.id === sessionId) {
 					currentMessages.value =
 						await chatService.getSessionMessages(sessionId);
@@ -588,7 +589,11 @@ export const useChatStore = defineStore('chat', () => {
 		const sessionState = getSessionState(sessionId);
 		if (!sessionState.closeStream) return;
 
-		sessionState.closeStream();
+		try {
+			await sessionState.closeStream(true);
+		} catch (error) {
+			console.error('停止后端图任务失败:', error);
+		}
 		sessionState.closeStream = null;
 		sessionState.isStreaming = false;
 		sessionState.nodeBlocks = [];

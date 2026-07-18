@@ -42,7 +42,9 @@ import com.alibaba.cloud.ai.graph.GraphRepresentation;
 import com.alibaba.cloud.ai.graph.KeyStrategy;
 import com.alibaba.cloud.ai.graph.KeyStrategyFactory;
 import com.alibaba.cloud.ai.graph.StateGraph;
+import com.alibaba.cloud.ai.graph.checkpoint.BaseCheckpointSaver;
 import com.alibaba.cloud.ai.graph.checkpoint.config.SaverConfig;
+import com.alibaba.cloud.ai.graph.checkpoint.savers.MemorySaver;
 import com.alibaba.cloud.ai.graph.checkpoint.savers.mysql.CreateOption;
 import com.alibaba.cloud.ai.graph.checkpoint.savers.mysql.MysqlSaver;
 import com.alibaba.cloud.ai.graph.exception.GraphStateException;
@@ -301,13 +303,24 @@ public class DataAgentConfiguration implements DisposableBean {
 	 * datasource and the human-review interruption point.
 	 */
 	@Bean
-	public CompileConfig nl2sqlGraphCompileConfig(StateGraph nl2sqlGraph, DataSource dataSource) {
-		MysqlSaver checkpointSaver = MysqlSaver.builder()
+	@ConditionalOnProperty(name = "spring.ai.alibaba.data-agent.checkpoint.type", havingValue = "mysql",
+			matchIfMissing = true)
+	public BaseCheckpointSaver mysqlCheckpointSaver(StateGraph nl2sqlGraph, DataSource dataSource) {
+		return MysqlSaver.builder()
 			.dataSource(dataSource)
 			.stateSerializer(nl2sqlGraph.getStateSerializer())
 			.createOption(CreateOption.CREATE_IF_NOT_EXISTS)
 			.build();
+	}
 
+	@Bean
+	@ConditionalOnProperty(name = "spring.ai.alibaba.data-agent.checkpoint.type", havingValue = "memory")
+	public BaseCheckpointSaver memoryCheckpointSaver() {
+		return MemorySaver.builder().build();
+	}
+
+	@Bean
+	public CompileConfig nl2sqlGraphCompileConfig(BaseCheckpointSaver checkpointSaver) {
 		SaverConfig saverConfig = SaverConfig.builder().register(checkpointSaver).build();
 		return CompileConfig.builder().saverConfig(saverConfig).interruptBefore(HUMAN_FEEDBACK_NODE).build();
 	}

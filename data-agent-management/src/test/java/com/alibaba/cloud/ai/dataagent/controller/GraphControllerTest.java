@@ -61,8 +61,8 @@ class GraphControllerTest {
 	void streamSearch_validRequest_invokesGraphServiceAndReturnsFlux() {
 		doNothing().when(graphService).graphStreamProcess(any(Sinks.Many.class), any(GraphRequest.class));
 
-		Flux<ServerSentEvent<GraphNodeResponse>> result = graphController.streamSearch("agent-1", "thread-1",
-				"show me sales data", false, null, false, false, serverHttpResponse);
+		Flux<ServerSentEvent<GraphNodeResponse>> result = graphController.streamSearch("agent-1", "conversation-1",
+				"thread-1", "show me sales data", false, null, false, false, serverHttpResponse);
 
 		assertNotNull(result);
 
@@ -71,6 +71,7 @@ class GraphControllerTest {
 
 		GraphRequest captured = requestCaptor.getValue();
 		assertEquals("agent-1", captured.getAgentId());
+		assertEquals("conversation-1", captured.getConversationId());
 		assertEquals("thread-1", captured.getThreadId());
 		assertEquals("show me sales data", captured.getQuery());
 		assertFalse(captured.isHumanFeedback());
@@ -80,8 +81,8 @@ class GraphControllerTest {
 	void streamSearch_humanFeedback_passesHumanFeedbackParams() {
 		doNothing().when(graphService).graphStreamProcess(any(Sinks.Many.class), any(GraphRequest.class));
 
-		Flux<ServerSentEvent<GraphNodeResponse>> result = graphController.streamSearch("agent-1", "thread-2",
-				"approve this plan", true, "looks good", false, false, serverHttpResponse);
+		Flux<ServerSentEvent<GraphNodeResponse>> result = graphController.streamSearch("agent-1", "conversation-2",
+				"thread-2", "approve this plan", true, "looks good", false, false, serverHttpResponse);
 
 		assertNotNull(result);
 
@@ -98,8 +99,8 @@ class GraphControllerTest {
 	void streamSearch_nl2sqlOnly_setsNl2sqlOnlyFlag() {
 		doNothing().when(graphService).graphStreamProcess(any(Sinks.Many.class), any(GraphRequest.class));
 
-		Flux<ServerSentEvent<GraphNodeResponse>> result = graphController.streamSearch("agent-1", null, "SELECT query",
-				false, null, false, true, serverHttpResponse);
+		Flux<ServerSentEvent<GraphNodeResponse>> result = graphController.streamSearch("agent-1", "conversation-3",
+				null, "SELECT query", false, null, false, true, serverHttpResponse);
 
 		assertNotNull(result);
 
@@ -109,6 +110,22 @@ class GraphControllerTest {
 		GraphRequest captured = requestCaptor.getValue();
 		assertTrue(captured.isNl2sqlOnly());
 		assertNull(captured.getThreadId());
+	}
+
+	@Test
+	void stopStream_withRunId_stopsExactGraphRun() {
+		graphController.stopStream("conversation-4", "run-4");
+
+		verify(graphService).stopStreamProcessing("run-4");
+		verify(graphService, never()).stopStreamProcessingByConversationId(anyString());
+	}
+
+	@Test
+	void stopStream_withoutRunId_stopsConversationRun() {
+		graphController.stopStream("conversation-5", null);
+
+		verify(graphService).stopStreamProcessingByConversationId("conversation-5");
+		verify(graphService, never()).stopStreamProcessing(anyString());
 	}
 
 }

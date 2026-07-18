@@ -23,6 +23,7 @@ import com.alibaba.cloud.ai.dataagent.service.graph.Context.MultiTurnContextMana
 import com.alibaba.cloud.ai.dataagent.service.graph.Context.StreamContext;
 import com.alibaba.cloud.ai.dataagent.vo.GraphNodeResponse;
 import com.alibaba.cloud.ai.graph.*;
+import com.alibaba.cloud.ai.graph.checkpoint.BaseCheckpointSaver;
 import com.alibaba.cloud.ai.graph.exception.GraphRunnerException;
 import com.alibaba.cloud.ai.graph.exception.GraphStateException;
 import com.alibaba.cloud.ai.graph.streaming.StreamingOutput;
@@ -52,16 +53,19 @@ public class GraphServiceImpl implements GraphService {
 
 	private final ExecutorService executor;
 
+	private final BaseCheckpointSaver checkpointSaver;
+
 	private final ConcurrentHashMap<String, StreamContext> streamContextMap = new ConcurrentHashMap<>();
 
 	private final MultiTurnContextManager multiTurnContextManager;
 
 	private final LangfuseService langfuseReporter;
 
-	public GraphServiceImpl(StateGraph stateGraph, CompileConfig compileConfig, ExecutorService executorService,
-			MultiTurnContextManager multiTurnContextManager, LangfuseService langfuseReporter)
-			throws GraphStateException {
+	public GraphServiceImpl(StateGraph stateGraph, CompileConfig compileConfig, BaseCheckpointSaver checkpointSaver,
+			ExecutorService executorService, MultiTurnContextManager multiTurnContextManager,
+			LangfuseService langfuseReporter) throws GraphStateException {
 		this.compiledGraph = stateGraph.compile(compileConfig);
+		this.checkpointSaver = checkpointSaver;
 		this.executor = executorService;
 		this.multiTurnContextManager = multiTurnContextManager;
 		this.langfuseReporter = langfuseReporter;
@@ -69,21 +73,40 @@ public class GraphServiceImpl implements GraphService {
 
 	@Override
 	public String nl2sql(String naturalQuery, String agentId) throws GraphRunnerException {
-		OverAllState state = compiledGraph
-			.invoke(Map.of(IS_ONLY_NL2SQL, true, INPUT_KEY, naturalQuery, AGENT_ID, agentId),
-					RunnableConfig.builder().build())
-			.orElseThrow();
-		return state.value(SQL_GENERATE_OUTPUT, "");
+		RunnableConfig config = RunnableConfig.builder().threadId(UUID.randomUUID().toString()).build();
+		try {
+			OverAllState state = compiledGraph
+				.invoke(Map.of(IS_ONLY_NL2SQL, true, INPUT_KEY, naturalQuery, AGENT_ID, agentId), config)
+				.orElseThrow();
+			return state.value(SQL_GENERATE_OUTPUT, "");
+		}
+		finally {
+			releaseCheckpoint(config);
+		}
 	}
 
 	@Override
 	public void graphStreamProcess(Sinks.Many<ServerSentEvent<GraphNodeResponse>> sink, GraphRequest graphRequest) {
-		if (!StringUtils.hasText(graphRequest.getThreadId())) {
+		boolean resuming = StringUtils.hasText(graphRequest.getHumanFeedbackContent());
+		if (!resuming) {
+			if (!StringUtils.hasText(graphRequest.getConversationId())) {
+				graphRequest.setConversationId(StringUtils.hasText(graphRequest.getThreadId())
+						? graphRequest.getThreadId() : UUID.randomUUID().toString());
+			}
 			graphRequest.setThreadId(UUID.randomUUID().toString());
+		}
+		else if (!StringUtils.hasText(graphRequest.getThreadId())) {
+			throw new IllegalArgumentException("Graph run ID is required when resuming human feedback");
+		}
+		if (!StringUtils.hasText(graphRequest.getConversationId())) {
+			// Compatibility for existing clients: their old threadId was both the
+			// conversation ID and graph run ID.
+			graphRequest.setConversationId(graphRequest.getThreadId());
 		}
 		String threadId = graphRequest.getThreadId();
 		// 创建或获取 StreamContext
 		StreamContext context = streamContextMap.computeIfAbsent(threadId, k -> new StreamContext());
+		context.setConversationId(graphRequest.getConversationId());
 		context.setSink(sink);
 		if (StringUtils.hasText(graphRequest.getHumanFeedbackContent())) {
 			handleHumanFeedback(graphRequest);
@@ -103,8 +126,8 @@ public class GraphServiceImpl implements GraphService {
 			return;
 		}
 		log.info("Stopping stream processing for threadId: {}", threadId);
-		multiTurnContextManager.discardPending(threadId);
 		StreamContext context = streamContextMap.remove(threadId);
+		multiTurnContextManager.discardPending(context != null ? context.getConversationId() : threadId);
 		if (context != null) {
 			// 客户端断开，结束 Langfuse span
 			if (context.getSpan() != null && context.getSpan().isRecording()) {
@@ -113,15 +136,32 @@ public class GraphServiceImpl implements GraphService {
 			context.cleanup();
 			log.info("Cleaned up stream context for threadId: {}", threadId);
 		}
+		// Dispose the graph subscription before releasing its checkpoint so a
+		// cancelled run cannot write another checkpoint after the release.
+		releaseCheckpoint(RunnableConfig.builder().threadId(threadId).build());
+	}
+
+	@Override
+	public void stopStreamProcessingByConversationId(String conversationId) {
+		if (!StringUtils.hasText(conversationId)) {
+			return;
+		}
+		streamContextMap.forEach((threadId, context) -> {
+			if (conversationId.equals(context.getConversationId())) {
+				stopStreamProcessing(threadId);
+			}
+		});
 	}
 
 	private void handleNewProcess(GraphRequest graphRequest) {
 		String query = graphRequest.getQuery();
 		String agentId = graphRequest.getAgentId();
 		String threadId = graphRequest.getThreadId();
+		String conversationId = graphRequest.getConversationId();
 		boolean nl2sqlOnly = graphRequest.isNl2sqlOnly();
 		boolean humanReviewEnabled = graphRequest.isHumanFeedback() & !(nl2sqlOnly);
-		if (!StringUtils.hasText(threadId) || !StringUtils.hasText(agentId) || !StringUtils.hasText(query)) {
+		if (!StringUtils.hasText(threadId) || !StringUtils.hasText(conversationId) || !StringUtils.hasText(agentId)
+				|| !StringUtils.hasText(query)) {
 			throw new IllegalArgumentException("Invalid arguments");
 		}
 		StreamContext context = streamContextMap.get(threadId);
@@ -137,8 +177,8 @@ public class GraphServiceImpl implements GraphService {
 		Span span = langfuseReporter.startLLMSpan("graph-stream", graphRequest);
 		context.setSpan(span);
 
-		String multiTurnContext = multiTurnContextManager.buildContext(threadId);
-		multiTurnContextManager.beginTurn(threadId, query);
+		String multiTurnContext = multiTurnContextManager.buildContext(conversationId);
+		multiTurnContextManager.beginTurn(conversationId, query);
 		Flux<NodeOutput> nodeOutputFlux = compiledGraph.stream(
 				Map.of(IS_ONLY_NL2SQL, nl2sqlOnly, INPUT_KEY, query, AGENT_ID, agentId, HUMAN_REVIEW_ENABLED,
 						humanReviewEnabled, MULTI_TURN_CONTEXT, multiTurnContext, TRACE_THREAD_ID, threadId),
@@ -149,8 +189,10 @@ public class GraphServiceImpl implements GraphService {
 	private void handleHumanFeedback(GraphRequest graphRequest) {
 		String agentId = graphRequest.getAgentId();
 		String threadId = graphRequest.getThreadId();
+		String conversationId = graphRequest.getConversationId();
 		String feedbackContent = graphRequest.getHumanFeedbackContent();
-		if (!StringUtils.hasText(threadId) || !StringUtils.hasText(agentId) || !StringUtils.hasText(feedbackContent)) {
+		if (!StringUtils.hasText(threadId) || !StringUtils.hasText(conversationId) || !StringUtils.hasText(agentId)
+				|| !StringUtils.hasText(feedbackContent)) {
 			throw new IllegalArgumentException("Invalid arguments");
 		}
 		StreamContext context = streamContextMap.get(threadId);
@@ -168,11 +210,11 @@ public class GraphServiceImpl implements GraphService {
 		Map<String, Object> feedbackData = Map.of("feedback", !graphRequest.isRejectedPlan(), "feedback_content",
 				feedbackContent);
 		if (graphRequest.isRejectedPlan()) {
-			multiTurnContextManager.restartLastTurn(threadId);
+			multiTurnContextManager.restartLastTurn(conversationId);
 		}
 		Map<String, Object> stateUpdate = new HashMap<>();
 		stateUpdate.put(HUMAN_FEEDBACK_DATA, feedbackData);
-		stateUpdate.put(MULTI_TURN_CONTEXT, multiTurnContextManager.buildContext(threadId));
+		stateUpdate.put(MULTI_TURN_CONTEXT, multiTurnContextManager.buildContext(conversationId));
 
 		RunnableConfig baseConfig = RunnableConfig.builder().threadId(threadId).build();
 		RunnableConfig updatedConfig;
@@ -207,8 +249,7 @@ public class GraphServiceImpl implements GraphService {
 				return;
 			}
 			Disposable disposable = nodeOutputFlux.subscribe(output -> handleNodeOutput(graphRequest, output),
-					error -> handleStreamError(agentId, threadId, error),
-					() -> handleStreamComplete(agentId, threadId));
+					error -> handleStreamError(graphRequest, error), () -> handleStreamComplete(graphRequest));
 			// 原子性地设置 Disposable，如果已经清理则立即释放
 			synchronized (context) {
 				if (context.isCleaned()) {
@@ -228,9 +269,13 @@ public class GraphServiceImpl implements GraphService {
 	/**
 	 * 处理流式错误 线程安全：使用 remove 操作确保只有一个线程能获取到 context
 	 */
-	private void handleStreamError(String agentId, String threadId, Throwable error) {
+	private void handleStreamError(GraphRequest request, Throwable error) {
+		String agentId = request.getAgentId();
+		String threadId = request.getThreadId();
 		log.error("Error in stream processing for threadId: {}: ", threadId, error);
 		StreamContext context = streamContextMap.remove(threadId);
+		multiTurnContextManager.discardPending(request.getConversationId());
+		releaseCheckpoint(RunnableConfig.builder().threadId(threadId).build());
 		if (context != null && !context.isCleaned()) {
 			// 结束 Langfuse span（失败）
 			if (context.getSpan() != null) {
@@ -254,9 +299,15 @@ public class GraphServiceImpl implements GraphService {
 	/**
 	 * 处理流式完成 线程安全：使用 remove 操作确保只有一个线程能获取到 context
 	 */
-	private void handleStreamComplete(String agentId, String threadId) {
+	private void handleStreamComplete(GraphRequest request) {
+		String agentId = request.getAgentId();
+		String threadId = request.getThreadId();
 		log.info("Stream processing completed successfully for threadId: {}", threadId);
-		multiTurnContextManager.finishTurn(threadId);
+		multiTurnContextManager.finishTurn(request.getConversationId());
+		RunnableConfig config = RunnableConfig.builder().threadId(threadId).build();
+		if (!isAwaitingHumanFeedback(request, config)) {
+			releaseCheckpoint(config);
+		}
 		StreamContext context = streamContextMap.remove(threadId);
 		if (context != null && !context.isCleaned()) {
 			// 结束 Langfuse span（成功）
@@ -322,7 +373,7 @@ public class GraphServiceImpl implements GraphService {
 		if (!isTypeSign) {
 			context.appendOutput(chunk);
 			if (PlannerNode.class.getSimpleName().equals(node)) {
-				multiTurnContextManager.appendPlannerChunk(threadId, chunk);
+				multiTurnContextManager.appendPlannerChunk(request.getConversationId(), chunk);
 			}
 			GraphNodeResponse response = GraphNodeResponse.builder()
 				.agentId(request.getAgentId())
@@ -339,6 +390,30 @@ public class GraphServiceImpl implements GraphService {
 				// 如果发送失败，停止处理
 				stopStreamProcessing(threadId);
 			}
+		}
+	}
+
+	private boolean isAwaitingHumanFeedback(GraphRequest request, RunnableConfig config) {
+		if (!request.isHumanFeedback() || StringUtils.hasText(request.getHumanFeedbackContent())) {
+			return false;
+		}
+		try {
+			return checkpointSaver.get(config)
+				.map(checkpoint -> HUMAN_FEEDBACK_NODE.equals(checkpoint.getNextNodeId()))
+				.orElse(false);
+		}
+		catch (Exception e) {
+			log.warn("Unable to inspect checkpoint for threadId: {}", request.getThreadId(), e);
+			return false;
+		}
+	}
+
+	private void releaseCheckpoint(RunnableConfig config) {
+		try {
+			checkpointSaver.release(config);
+		}
+		catch (Exception e) {
+			log.warn("Unable to release checkpoint for threadId: {}", config.threadId().orElse("unknown"), e);
 		}
 	}
 

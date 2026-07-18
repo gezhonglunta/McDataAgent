@@ -20,14 +20,11 @@ import com.alibaba.cloud.ai.dataagent.service.file.FileStorageServiceFactory;
 import com.alibaba.cloud.ai.dataagent.service.llm.LlmServiceFactory;
 import com.alibaba.cloud.ai.graph.CompileConfig;
 import com.alibaba.cloud.ai.graph.RunnableConfig;
-import com.alibaba.cloud.ai.graph.StateGraph;
 import com.alibaba.cloud.ai.graph.checkpoint.BaseCheckpointSaver;
 import com.alibaba.cloud.ai.graph.checkpoint.Checkpoint;
-import com.alibaba.cloud.ai.graph.checkpoint.savers.mysql.MysqlSaver;
+import com.alibaba.cloud.ai.graph.checkpoint.savers.MemorySaver;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.FactoryBean;
-import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.jdbc.datasource.DriverManagerDataSource;
 
 import java.util.Map;
 import java.util.UUID;
@@ -45,20 +42,10 @@ class DataAgentConfigurationTest {
 	}
 
 	@Test
-	void nl2sqlGraphCompileConfig_persistsCheckpointWithFrameworkMysqlSaver() throws Exception {
-		DriverManagerDataSource dataSource = new DriverManagerDataSource();
-		dataSource.setDriverClassName("org.h2.Driver");
-		dataSource.setUrl("jdbc:h2:mem:graph-checkpoint;MODE=MySQL;DB_CLOSE_DELAY=-1");
-		JdbcTemplate jdbcTemplate = new JdbcTemplate(dataSource);
-		// MysqlSaver intentionally uses MySQL JSON functions. Register harmless H2
-		// aliases so this focused test can exercise the framework's MySQL write path.
-		jdbcTemplate
-			.execute("CREATE ALIAS JSON_EXTRACT FOR '" + DataAgentConfigurationTest.class.getName() + ".jsonExtract'");
-		jdbcTemplate
-			.execute("CREATE ALIAS JSON_UNQUOTE FOR '" + DataAgentConfigurationTest.class.getName() + ".jsonUnquote'");
-
-		CompileConfig compileConfig = new DataAgentConfiguration().nl2sqlGraphCompileConfig(new StateGraph(),
-				dataSource);
+	void nl2sqlGraphCompileConfig_usesProvidedFrameworkSaver() throws Exception {
+		DataAgentConfiguration configuration = new DataAgentConfiguration();
+		BaseCheckpointSaver configuredSaver = configuration.memoryCheckpointSaver();
+		CompileConfig compileConfig = configuration.nl2sqlGraphCompileConfig(configuredSaver);
 		BaseCheckpointSaver checkpointSaver = compileConfig.checkpointSaver().orElseThrow();
 		RunnableConfig runnableConfig = RunnableConfig.builder().threadId("chat-session-1").build();
 		Checkpoint checkpoint = Checkpoint.builder()
@@ -70,18 +57,11 @@ class DataAgentConfigurationTest {
 
 		checkpointSaver.put(runnableConfig, checkpoint);
 
-		assertThat(checkpointSaver).isInstanceOf(MysqlSaver.class);
+		assertThat(checkpointSaver).isInstanceOf(MemorySaver.class);
 		assertThat(compileConfig.interruptsBefore()).contains(HUMAN_FEEDBACK_NODE);
-		assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM GRAPH_THREAD", Integer.class)).isEqualTo(1);
-		assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM GRAPH_CHECKPOINT", Integer.class)).isEqualTo(1);
-	}
-
-	public static String jsonExtract(String json, String path) {
-		return json;
-	}
-
-	public static String jsonUnquote(String value) {
-		return value;
+		assertThat(checkpointSaver.get(runnableConfig)).isPresent();
+		checkpointSaver.release(runnableConfig);
+		assertThat(checkpointSaver.get(runnableConfig)).isEmpty();
 	}
 
 }
