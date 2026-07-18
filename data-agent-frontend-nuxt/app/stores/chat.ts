@@ -22,6 +22,7 @@ import chatService, {
 import graphService, {
 	type GraphRequest,
 	type GraphNodeResponse,
+	GraphEventType,
 	TextType,
 } from '~/services/graph/index';
 import agentDatasourceService from '~/services/agentDatasource/index';
@@ -45,31 +46,6 @@ export interface ChatRequestOptions {
 	nl2sqlOnly: boolean;
 	showSqlResults: boolean;
 	pageSize: number;
-}
-
-function extractIntentReply(blocks: GraphNodeResponse[][]): string | null {
-	const json = blocks
-		.flat()
-		.filter(
-			(item) =>
-				item.nodeName === 'IntentRecognitionNode' &&
-				item.textType === TextType.JSON,
-		)
-		.map((item) => item.text)
-		.join('')
-		.trim();
-	if (!json) return null;
-
-	try {
-		const result = JSON.parse(json) as {
-			classification?: string;
-			response?: string;
-		};
-		if (result.classification !== '《闲聊或无关指令》') return null;
-		return result.response?.trim() || null;
-	} catch {
-		return null;
-	}
 }
 
 export const useChatStore = defineStore('chat', () => {
@@ -365,8 +341,9 @@ export const useChatStore = defineStore('chat', () => {
 		streamingReportContent.value = '';
 		isReportStreaming.value = false;
 
-		let currentNodeName: string | null = null;
+		let currentStepId: string | null = null;
 		let currentBlockIndex = -1;
+		let finalReply: string | null = null;
 
 		let viewSyncRafId: number | null = null;
 		function scheduleViewSync() {
@@ -417,71 +394,40 @@ export const useChatStore = defineStore('chat', () => {
 			request,
 			async (response: GraphNodeResponse) => {
 				if (response.error) return;
+				if (response.eventType === GraphEventType.FINAL_ANSWER) {
+					finalReply = response.text?.trim() || null;
+					return;
+				}
 				if (sessionState.lastRequest)
 					sessionState.lastRequest.threadId = response.threadId;
 
+				const responseStepId =
+					response.stepId || `${response.nodeName}:${response.attempt || 1}`;
+				const isNewStep = currentStepId !== responseStepId;
+				if (isNewStep) {
+					sessionState.nodeBlocks.push([{ ...response }]);
+					currentBlockIndex = sessionState.nodeBlocks.length - 1;
+					currentStepId = responseStepId;
+				}
+				const currentBlock = sessionState.nodeBlocks[currentBlockIndex];
+
 				if (response.nodeName === 'ReportGeneratorNode') {
-					const isNewNode =
-						currentNodeName === null || response.nodeName !== currentNodeName;
-					if (isNewNode) {
-						sessionState.nodeBlocks.push([{ ...response }]);
-						currentBlockIndex = sessionState.nodeBlocks.length - 1;
-						currentNodeName = response.nodeName;
-					}
 					if (response.textType === 'HTML') {
 						sessionState.htmlReportContent += response.text;
 						sessionState.htmlReportSize = sessionState.htmlReportContent.length;
-						const rn = sessionState.nodeBlocks.find(
-							(b) =>
-								b.length > 0 &&
-								b[0].nodeName === 'ReportGeneratorNode' &&
-								b[0].textType === 'HTML',
-						);
+						const rn = currentBlock;
 						if (rn)
 							rn[0].text = `正在收集HTML报告... 已收集 ${sessionState.htmlReportSize} 字节`;
-						else
-							sessionState.nodeBlocks.push([
-								{ ...response, text: `正在收集HTML报告...` },
-							]);
 					} else if (response.textType === 'MARK_DOWN') {
 						sessionState.markdownReportContent += response.text;
 						scheduleReportSync();
-						const rn = sessionState.nodeBlocks.find(
-							(b) =>
-								b.length > 0 &&
-								b[0].nodeName === 'ReportGeneratorNode' &&
-								b[0].textType === 'MARK_DOWN',
-						);
+						const rn = currentBlock;
 						if (rn) rn[0].text = sessionState.markdownReportContent;
-						else
-							sessionState.nodeBlocks.push([
-								{ ...response, text: response.text },
-							]);
 					}
 				} else if (response.textType === TextType.RESULT_SET) {
-					currentNodeName = 'result_set';
-					sessionState.nodeBlocks.push([{ ...response }]);
-					currentBlockIndex = sessionState.nodeBlocks.length - 1;
-				} else {
-					const isNewNode =
-						currentNodeName === null || response.nodeName !== currentNodeName;
-					if (isNewNode) {
-						sessionState.nodeBlocks.push([{ ...response }]);
-						currentBlockIndex = sessionState.nodeBlocks.length - 1;
-						currentNodeName = response.nodeName;
-					} else {
-						const currentBlock =
-							currentBlockIndex >= 0
-								? sessionState.nodeBlocks[currentBlockIndex]
-								: undefined;
-						if (currentBlock) {
-							currentBlock.push({ ...response });
-						} else {
-							sessionState.nodeBlocks.push([{ ...response }]);
-							currentBlockIndex = sessionState.nodeBlocks.length - 1;
-							currentNodeName = response.nodeName;
-						}
-					}
+					if (!isNewStep && currentBlock) currentBlock.push({ ...response });
+				} else if (!isNewStep && currentBlock) {
+					currentBlock.push({ ...response });
 				}
 
 				scheduleViewSync();
@@ -515,7 +461,7 @@ export const useChatStore = defineStore('chat', () => {
 
 				sessionState.isStreaming = false;
 				sessionState.closeStream = null;
-				currentNodeName = null;
+				currentStepId = null;
 				if (currentSession.value?.id === sessionId) {
 					isStreaming.value = false;
 					isReportStreaming.value = false;
@@ -526,8 +472,6 @@ export const useChatStore = defineStore('chat', () => {
 			},
 			async () => {
 				flushPendingSync();
-				const intentReply = extractIntentReply(sessionState.nodeBlocks);
-
 				if (sessionState.nodeBlocks.length > 0) {
 					const timelineMsg: ChatMessage = {
 						sessionId,
@@ -545,11 +489,11 @@ export const useChatStore = defineStore('chat', () => {
 						currentMessages.value.push(savedTimeline);
 				}
 
-				if (intentReply) {
+				if (finalReply) {
 					const replyMessage: ChatMessage = {
 						sessionId,
 						role: 'assistant',
-						content: intentReply,
+						content: finalReply,
 						messageType: 'text',
 					};
 					await chatService
@@ -557,7 +501,7 @@ export const useChatStore = defineStore('chat', () => {
 						.catch((e) => console.error(e));
 				}
 
-				if (requestOptions.value.humanFeedback && _rejectedPlan) {
+				if (requestOptions.value.humanFeedback && _rejectedPlan && !finalReply) {
 					showHumanFeedback.value = true;
 				} else {
 					sessionState.isStreaming = false;
@@ -569,7 +513,7 @@ export const useChatStore = defineStore('chat', () => {
 					streamingReportContent.value = '';
 				}
 
-				currentNodeName = null;
+				currentStepId = null;
 				await closeStream();
 				sessionState.closeStream = null;
 				if (currentSession.value?.id === sessionId) {

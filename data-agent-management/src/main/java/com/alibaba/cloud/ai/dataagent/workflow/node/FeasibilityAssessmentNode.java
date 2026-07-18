@@ -33,6 +33,7 @@ import org.springframework.stereotype.Component;
 import reactor.core.publisher.Flux;
 
 import java.util.Map;
+import java.util.HashMap;
 
 import static com.alibaba.cloud.ai.dataagent.constant.Constant.*;
 
@@ -72,7 +73,14 @@ public class FeasibilityAssessmentNode implements NodeAction {
 				state, "正在进行可行性评估...", "可行性评估完成！", llmOutput -> {
 					FeasibilityAssessmentOutputDTO assessmentResult = OUTPUT_CONVERTER.convert(llmOutput);
 					log.info("Feasibility assessment result: {}", assessmentResult);
-					return Map.of(FEASIBILITY_ASSESSMENT_NODE_OUTPUT, assessmentResult);
+					Map<String, Object> output = new HashMap<>();
+					output.put(FEASIBILITY_ASSESSMENT_NODE_OUTPUT, assessmentResult);
+					if (assessmentResult
+						.getRequirementType() != FeasibilityAssessmentOutputDTO.RequirementType.DATA_ANALYSIS
+							&& org.springframework.util.StringUtils.hasText(assessmentResult.getContent())) {
+						output.put(FINAL_ANSWER, assessmentResult.getContent().trim());
+					}
+					return output;
 				}, responseFlux);
 		return Map.of(FEASIBILITY_ASSESSMENT_NODE_OUTPUT, generator);
 	}

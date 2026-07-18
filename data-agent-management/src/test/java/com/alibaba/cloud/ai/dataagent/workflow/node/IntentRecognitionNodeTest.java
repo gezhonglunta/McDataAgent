@@ -22,6 +22,8 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.time.Duration;
+import java.util.List;
 import java.util.Map;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -36,7 +38,9 @@ import com.alibaba.cloud.ai.dataagent.enums.TextType;
 import com.alibaba.cloud.ai.dataagent.service.llm.LlmService;
 import com.alibaba.cloud.ai.dataagent.util.ChatResponseUtil;
 import com.alibaba.cloud.ai.graph.OverAllState;
+import com.alibaba.cloud.ai.graph.GraphResponse;
 import com.alibaba.cloud.ai.graph.state.strategy.ReplaceStrategy;
+import com.alibaba.cloud.ai.graph.streaming.StreamingOutput;
 
 import reactor.core.publisher.Flux;
 
@@ -68,7 +72,22 @@ class IntentRecognitionNodeTest {
 		state.registerKeyAndStrategy(INTENT_RECOGNITION_NODE_OUTPUT, new ReplaceStrategy());
 		state.registerKeyAndStrategy(INPUT_KEY, new ReplaceStrategy());
 		state.registerKeyAndStrategy(MULTI_TURN_CONTEXT, new ReplaceStrategy());
+		state.registerKeyAndStrategy(FINAL_ANSWER, new ReplaceStrategy());
 		return state;
+	}
+
+	@SuppressWarnings("unchecked")
+	private Map<String, Object> execute(Map<String, Object> nodeResult) {
+		Flux<GraphResponse<StreamingOutput>> generator = (Flux<GraphResponse<StreamingOutput>>) nodeResult
+			.get(INTENT_RECOGNITION_NODE_OUTPUT);
+		List<GraphResponse<StreamingOutput>> responses = generator.collectList().block(Duration.ofSeconds(2));
+		assertNotNull(responses);
+		return responses.stream()
+			.filter(GraphResponse::isDone)
+			.findFirst()
+			.flatMap(GraphResponse::resultValue)
+			.map(value -> (Map<String, Object>) value)
+			.orElseThrow();
 	}
 
 	@Test
@@ -77,16 +96,13 @@ class IntentRecognitionNodeTest {
 		state.updateState(Map.of(INPUT_KEY, CHAT_QUERY, MULTI_TURN_CONTEXT, "(无)"));
 
 		when(llmService.callUser(anyString(), any()))
-			.thenReturn(Flux.just(ChatResponseUtil.createResponse("正在进行意图识别..."),
-					ChatResponseUtil.createPureResponse(TextType.JSON.getStartSign()),
-					ChatResponseUtil.createPureResponse(JSON_ANALYSIS),
-					ChatResponseUtil.createPureResponse(TextType.JSON.getEndSign()),
-					ChatResponseUtil.createResponse("\n意图识别完成！")));
+			.thenReturn(Flux.just(ChatResponseUtil.createPureResponse(JSON_ANALYSIS)));
 
 		Map<String, Object> result = intentRecognitionNode.apply(state);
 
 		assertNotNull(result);
 		assertTrue(result.containsKey(INTENT_RECOGNITION_NODE_OUTPUT));
+		assertFalse(execute(result).containsKey(FINAL_ANSWER));
 	}
 
 	@Test
@@ -94,21 +110,18 @@ class IntentRecognitionNodeTest {
 		OverAllState state = createTestState();
 		state.updateState(Map.of(INPUT_KEY, "你好", MULTI_TURN_CONTEXT, "(无)"));
 
-		when(llmService.callUser(anyString(), any()))
-			.thenReturn(Flux.just(ChatResponseUtil.createResponse("正在进行意图识别..."),
-					ChatResponseUtil.createPureResponse(TextType.JSON.getStartSign()),
-					ChatResponseUtil.createPureResponse("""
-							{
-								"classification": "《闲聊或无关指令》",
-								"response": "你好！我可以帮你分析已连接的数据。"
-							}
-							"""), ChatResponseUtil.createPureResponse(TextType.JSON.getEndSign()),
-					ChatResponseUtil.createResponse("\n意图识别完成！")));
+		when(llmService.callUser(anyString(), any())).thenReturn(Flux.just(ChatResponseUtil.createPureResponse("""
+				{
+					"classification": "《闲聊或无关指令》",
+					"response": "你好！我可以帮你分析已连接的数据。"
+				}
+				""")));
 
 		Map<String, Object> result = intentRecognitionNode.apply(state);
 
 		assertNotNull(result);
 		assertTrue(result.containsKey(INTENT_RECOGNITION_NODE_OUTPUT));
+		assertEquals("你好！我可以帮你分析已连接的数据。", execute(result).get(FINAL_ANSWER));
 	}
 
 	@Test

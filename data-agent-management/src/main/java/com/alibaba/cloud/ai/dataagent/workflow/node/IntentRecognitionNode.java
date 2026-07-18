@@ -34,6 +34,7 @@ import org.springframework.stereotype.Component;
 import reactor.core.publisher.Flux;
 
 import java.util.Map;
+import java.util.HashMap;
 
 import static com.alibaba.cloud.ai.dataagent.constant.Constant.*;
 
@@ -72,7 +73,16 @@ public class IntentRecognitionNode implements NodeAction {
 						ChatResponseUtil.createPureResponse(TextType.JSON.getStartSign())),
 				Flux.just(ChatResponseUtil.createPureResponse(TextType.JSON.getEndSign()),
 						ChatResponseUtil.createResponse("\n意图识别完成！")),
-				result -> Map.of(INTENT_RECOGNITION_NODE_OUTPUT, OUTPUT_CONVERTER.convert(result)));
+				result -> {
+					IntentRecognitionOutputDTO intent = OUTPUT_CONVERTER.convert(result);
+					Map<String, Object> output = new HashMap<>();
+					output.put(INTENT_RECOGNITION_NODE_OUTPUT, intent);
+					if ("《闲聊或无关指令》".equals(intent.getClassification())
+							&& org.springframework.util.StringUtils.hasText(intent.getResponse())) {
+						output.put(FINAL_ANSWER, intent.getResponse().trim());
+					}
+					return output;
+				});
 		return Map.of(INTENT_RECOGNITION_NODE_OUTPUT, generator);
 	}
 

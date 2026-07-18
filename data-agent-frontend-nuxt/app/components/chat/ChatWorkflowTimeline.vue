@@ -43,13 +43,13 @@
 		<v-timeline density="compact" side="end" truncate-line="both">
 			<v-timeline-item
 				v-for="step in timelineSteps"
-				:key="step.nodeName"
+				:key="step.stepId"
 				:dot-color="dotColor(step.status)"
 				:icon="dotIcon(step.status)"
 				size="small"
 			>
 				<!-- Step header: clickable to toggle -->
-				<div class="step-header" @click="toggleStep(step.nodeName)">
+				<div class="step-header" @click="toggleStep(step)">
 					<div class="step-header-left">
 						<span class="step-label">{{ step.label }}</span>
 						<span v-if="step.status === 'active'" class="step-badge active">
@@ -113,6 +113,7 @@ import { TextType, type GraphNodeResponse } from '~/services/graph/index';
 import type { ResultData } from '~/services/resultSet/index';
 import ChatResultSet from './ChatResultSet.vue';
 import { useChatStore } from '~/stores/chat';
+import { groupWorkflowTimeline } from '~/utils/workflowTimeline';
 
 const store = useChatStore();
 
@@ -137,14 +138,14 @@ const allExpanded = computed(() => {
 function toggleAll() {
 	const shouldExpand = !allExpanded.value;
 	for (const step of timelineSteps.value) {
-		expandedSteps.value[step.nodeName] = shouldExpand;
+		expandedSteps.value[step.stepId] = shouldExpand;
 	}
 }
 
-function toggleStep(nodeName: string) {
-	const defaultExpanded = getDefaultExpanded(nodeName);
-	expandedSteps.value[nodeName] = !(
-		expandedSteps.value[nodeName] ?? defaultExpanded
+function toggleStep(step: TimelineStep) {
+	const defaultExpanded = getDefaultExpanded(step.nodeName);
+	expandedSteps.value[step.stepId] = !(
+		expandedSteps.value[step.stepId] ?? defaultExpanded
 	);
 }
 
@@ -244,6 +245,8 @@ const NODE_LABEL_MAP: Record<string, NodeDef> = {
 };
 
 interface TimelineStep extends NodeDef {
+	stepId: string;
+	attempt: number;
 	status: 'pending' | 'active' | 'done';
 	contentBlock: GraphNodeResponse[];
 	resultSetText?: string;
@@ -252,32 +255,21 @@ interface TimelineStep extends NodeDef {
 }
 
 const timelineSteps = computed<TimelineStep[]>(() => {
-	const seen = new Set<string>();
-	const orderedNodeNames: string[] = [];
-	for (const block of props.nodeBlocks) {
-		const name = block[0]?.nodeName;
-		if (name && !seen.has(name)) {
-			seen.add(name);
-			orderedNodeNames.push(name);
-		}
-	}
+	const groups = groupWorkflowTimeline(props.nodeBlocks);
+	if (groups.length === 0) return [];
+	const lastIdx = groups.length - 1;
 
-	if (orderedNodeNames.length === 0) return [];
-	const lastIdx = orderedNodeNames.length - 1;
-
-	return orderedNodeNames.map((nodeName, idx) => {
+	return groups.map((group, idx) => {
+		const { nodeName, stepId, attempt, items: block } = group;
 		const def = NODE_LABEL_MAP[nodeName] || {
 			nodeName,
 			label: nodeName,
 			icon: 'mdi-lightning-bolt',
 		};
-		const block = props.nodeBlocks
-			.filter((candidate) => candidate[0]?.nodeName === nodeName)
-			.flat();
 		const contentBlock = block.filter(
 			(item) => item.textType !== TextType.RESULT_SET,
 		);
-		const resultSetText = block.find(
+		const resultSetText = [...block].reverse().find(
 			(item) => item.textType === TextType.RESULT_SET && item.text,
 		)?.text;
 		const isReport = nodeName === 'ReportGeneratorNode';
@@ -291,10 +283,13 @@ const timelineSteps = computed<TimelineStep[]>(() => {
 
 		return {
 			...def,
+			stepId,
+			attempt,
+			label: attempt > 1 ? `${def.label}（第 ${attempt} 次）` : def.label,
 			status,
 			contentBlock,
 			resultSetText,
-			expanded: expandedSteps.value[nodeName] ?? getDefaultExpanded(nodeName),
+			expanded: expandedSteps.value[stepId] ?? getDefaultExpanded(nodeName),
 			isReport,
 		};
 	});
