@@ -333,18 +333,6 @@
             <artifactId>protobuf-java</artifactId>
             <version>3.25.5</version>
         </dependency>
-        <!-- 显式添加Elasticsearch Java客户端依赖以解决DenseVectorSimilarity类缺失问题 -->
-        <dependency>
-            <groupId>co.elastic.clients</groupId>
-            <artifactId>elasticsearch-java</artifactId>
-            <version>${elasticsearch-client.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>org.elasticsearch.client</groupId>
-            <artifactId>elasticsearch-rest-client</artifactId>
-            <version>${elasticsearch-client.version}</version>
-        </dependency>
-
         <dependency>
             <groupId>jakarta.validation</groupId>
             <artifactId>jakarta.validation-api</artifactId>

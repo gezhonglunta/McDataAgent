@@ -9,11 +9,6 @@ springdoc:
 
 # 存储 DataAgent 业务数据的数据库，并非Agent分析数据的来源
 spring:
-  main:
-    allow-bean-definition-overriding: true
-  autoconfigure:
-    exclude:
-      - org.springframework.ai.vectorstore.elasticsearch.autoconfigure.ElasticsearchVectorStoreAutoConfiguration
   datasource:
     url: ${DATA_AGENT_DATASOURCE_URL:jdbc:mysql://127.0.0.1:3306/saa_data_agent?useUnicode=true&characterEncoding=utf-8&zeroDateTimeBehavior=convertToNull&transformedBitIsBoolean=true&allowMultiQueries=true&allowPublicKeyRetrieval=true&useSSL=false&serverTimezone=Asia/Shanghai}
     username: ${DATA_AGENT_DATASOURCE_USERNAME:root}
@@ -34,14 +29,7 @@ spring:
           jdbc:
             initialize-schema: always
     vectorstore:
-      type: milvus  # 指定向量库类型，不加此配置会回退到 SimpleVectorStore（内存）
-      milvus:
-        host: ${MILVUS_HOST:127.0.0.1}
-        port: ${MILVUS_PORT:19530}
-        database-name: ${MILVUS_DATABASE:default}
-        collection-name: ${MILVUS_COLLECTION:vector_store}
-        embedding-dimension: ${MILVUS_DIMENSION:1024}  # text-embedding-v4 输出 1024 维
-        initialize-schema: true  # 首次启动时自动创建 Collection
+      type: simple
     alibaba:
       data-agent:
         vector-store:

@@ -113,17 +113,20 @@ public class DataAgentConfiguration implements DisposableBean {
 	private ExecutorService dbOperationExecutor;
 
 	@Bean
+	@ConditionalOnMissingBean(LlmService.class)
 	public LlmService llmService(DataAgentProperties properties, AiModelRegistry aiModelRegistry) {
 		return new LlmServiceFactory(properties, aiModelRegistry).getObject();
 	}
 
 	@Bean
+	@ConditionalOnMissingBean(FileStorageService.class)
 	public FileStorageService fileStorageService(FileStorageProperties properties,
 			OssStorageProperties ossStorageProperties) {
 		return new FileStorageServiceFactory(properties, ossStorageProperties).getObject();
 	}
 
 	@Bean
+	@ConditionalOnMissingBean(CodePoolExecutorService.class)
 	public CodePoolExecutorService codePoolExecutorService(CodeExecutorProperties properties, LlmService llmService,
 			DockerExecutorFactory dockerExecutorFactory) {
 		return new CodePoolExecutorServiceFactory(properties, llmService, dockerExecutorFactory).getObject();
