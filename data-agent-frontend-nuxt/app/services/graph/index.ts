@@ -69,6 +69,7 @@ export interface GraphNodeResponse {
 export enum GraphEventType {
   NODE_OUTPUT = "NODE_OUTPUT",
   FINAL_ANSWER = "FINAL_ANSWER",
+  HUMAN_FEEDBACK_REQUIRED = "HUMAN_FEEDBACK_REQUIRED",
 }
 
 /**

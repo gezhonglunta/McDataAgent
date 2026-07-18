@@ -16,6 +16,7 @@
 package com.alibaba.cloud.ai.dataagent.controller;
 
 import com.alibaba.cloud.ai.dataagent.dto.GraphRequest;
+import com.alibaba.cloud.ai.dataagent.enums.GraphEventType;
 import com.alibaba.cloud.ai.dataagent.service.graph.GraphService;
 import com.alibaba.cloud.ai.dataagent.vo.GraphNodeResponse;
 import lombok.AllArgsConstructor;
@@ -75,6 +76,12 @@ public class GraphController {
 		return sink.asFlux().filter(sse -> {
 			// 1. 如果 event 是 "complete" 或 "error"，直接放行（不管 text 是否为空）
 			if (STREAM_EVENT_COMPLETE.equals(sse.event()) || STREAM_EVENT_ERROR.equals(sse.event())) {
+				return true;
+			}
+			// Protocol events carry state transitions in eventType and do not require
+			// display text.
+			if (sse.data() != null && sse.data().getEventType() != null
+					&& !GraphEventType.NODE_OUTPUT.equals(sse.data().getEventType())) {
 				return true;
 			}
 			// 判断字符串是否为空

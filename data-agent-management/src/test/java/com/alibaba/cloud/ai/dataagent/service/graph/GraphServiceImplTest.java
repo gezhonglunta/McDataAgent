@@ -26,6 +26,7 @@ import com.alibaba.cloud.ai.graph.OverAllState;
 import com.alibaba.cloud.ai.graph.RunnableConfig;
 import com.alibaba.cloud.ai.graph.StateGraph;
 import com.alibaba.cloud.ai.graph.checkpoint.BaseCheckpointSaver;
+import com.alibaba.cloud.ai.graph.checkpoint.Checkpoint;
 import com.alibaba.cloud.ai.graph.exception.GraphRunnerException;
 import com.alibaba.cloud.ai.graph.streaming.StreamingOutput;
 import com.alibaba.cloud.ai.graph.state.strategy.ReplaceStrategy;
@@ -187,6 +188,102 @@ class GraphServiceImplTest {
 		verify(compiledGraph).updateState(configCaptor.capture(), anyMap());
 		assertEquals("interrupted-run", configCaptor.getValue().threadId().orElseThrow());
 		assertEquals("interrupted-run", request.getThreadId());
+	}
+
+	@Test
+	void graphStreamProcess_interruptedForHumanFeedback_emitsRequiredEventAndRetainsCheckpoint() throws Exception {
+		Checkpoint checkpoint = Checkpoint.builder()
+			.nodeId("PLANNER_NODE")
+			.nextNodeId("HUMAN_FEEDBACK_NODE")
+			.state(java.util.Map.of())
+			.build();
+		when(checkpointSaver.get(any(RunnableConfig.class))).thenReturn(Optional.of(checkpoint));
+		when(compiledGraph.stream(anyMap(), any(RunnableConfig.class))).thenReturn(Flux.empty());
+
+		Sinks.Many<ServerSentEvent<GraphNodeResponse>> sink = Sinks.many().unicast().onBackpressureBuffer();
+		var responsesFuture = sink.asFlux().map(ServerSentEvent::data).collectList().toFuture();
+		GraphRequest request = GraphRequest.builder()
+			.agentId("1")
+			.conversationId("conversation-1")
+			.query("review this plan")
+			.humanFeedback(true)
+			.build();
+
+		graphService.graphStreamProcess(sink, request);
+		List<GraphNodeResponse> responses = responsesFuture.get(Duration.ofSeconds(2).toMillis(),
+				TimeUnit.MILLISECONDS);
+
+		assertTrue(
+				responses.stream()
+					.anyMatch(response -> "HUMAN_FEEDBACK_REQUIRED".equals(response.getEventType().name())),
+				responses.toString());
+		verify(checkpointSaver, never()).release(any(RunnableConfig.class));
+	}
+
+	@Test
+	void graphStreamProcess_completedBeforeHumanFeedback_doesNotEmitRequiredEventAndReleasesCheckpoint()
+			throws Exception {
+		Checkpoint checkpoint = Checkpoint.builder()
+			.nodeId("SCHEMA_RECALL_NODE")
+			.nextNodeId("__END__")
+			.state(java.util.Map.of())
+			.build();
+		when(checkpointSaver.get(any(RunnableConfig.class))).thenReturn(Optional.of(checkpoint));
+		when(compiledGraph.stream(anyMap(), any(RunnableConfig.class))).thenReturn(Flux.empty());
+
+		Sinks.Many<ServerSentEvent<GraphNodeResponse>> sink = Sinks.many().unicast().onBackpressureBuffer();
+		var responsesFuture = sink.asFlux().map(ServerSentEvent::data).collectList().toFuture();
+		GraphRequest request = GraphRequest.builder()
+			.agentId("1")
+			.conversationId("conversation-1")
+			.query("query without available schema")
+			.humanFeedback(true)
+			.build();
+
+		graphService.graphStreamProcess(sink, request);
+		List<GraphNodeResponse> responses = responsesFuture.get(Duration.ofSeconds(2).toMillis(),
+				TimeUnit.MILLISECONDS);
+
+		assertFalse(
+				responses.stream()
+					.anyMatch(response -> "HUMAN_FEEDBACK_REQUIRED".equals(response.getEventType().name())),
+				responses.toString());
+		verify(checkpointSaver).release(any(RunnableConfig.class));
+	}
+
+	@Test
+	void graphStreamProcess_rejectedFeedbackInterruptedAgain_emitsRequiredEventAndRetainsCheckpoint() throws Exception {
+		Checkpoint checkpoint = Checkpoint.builder()
+			.nodeId("PLANNER_NODE")
+			.nextNodeId("HUMAN_FEEDBACK_NODE")
+			.state(java.util.Map.of())
+			.build();
+		when(checkpointSaver.get(any(RunnableConfig.class))).thenReturn(Optional.of(checkpoint));
+		when(compiledGraph.updateState(any(RunnableConfig.class), anyMap()))
+			.thenReturn(RunnableConfig.builder().threadId("interrupted-run").build());
+		when(compiledGraph.stream(isNull(), any(RunnableConfig.class))).thenReturn(Flux.empty());
+
+		Sinks.Many<ServerSentEvent<GraphNodeResponse>> sink = Sinks.many().unicast().onBackpressureBuffer();
+		var responsesFuture = sink.asFlux().map(ServerSentEvent::data).collectList().toFuture();
+		GraphRequest request = GraphRequest.builder()
+			.agentId("1")
+			.conversationId("conversation-1")
+			.threadId("interrupted-run")
+			.query("review this plan")
+			.humanFeedback(true)
+			.humanFeedbackContent("please revise")
+			.rejectedPlan(true)
+			.build();
+
+		graphService.graphStreamProcess(sink, request);
+		List<GraphNodeResponse> responses = responsesFuture.get(Duration.ofSeconds(2).toMillis(),
+				TimeUnit.MILLISECONDS);
+
+		assertTrue(
+				responses.stream()
+					.anyMatch(response -> GraphEventType.HUMAN_FEEDBACK_REQUIRED.equals(response.getEventType())),
+				responses.toString());
+		verify(checkpointSaver, never()).release(any(RunnableConfig.class));
 	}
 
 	@Test

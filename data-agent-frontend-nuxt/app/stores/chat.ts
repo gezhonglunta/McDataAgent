@@ -314,13 +314,10 @@ export const useChatStore = defineStore('chat', () => {
 			threadId: undefined,
 		};
 
-		await _sendGraphRequest(request, true);
+		await _sendGraphRequest(request);
 	}
 
-	async function _sendGraphRequest(
-		request: GraphRequest,
-		_rejectedPlan: boolean,
-	) {
+	async function _sendGraphRequest(request: GraphRequest) {
 		const session = currentSession.value;
 		if (!session) return;
 
@@ -344,6 +341,7 @@ export const useChatStore = defineStore('chat', () => {
 		let currentStepId: string | null = null;
 		let currentBlockIndex = -1;
 		let finalReply: string | null = null;
+		let awaitingHumanFeedback = false;
 
 		let viewSyncRafId: number | null = null;
 		function scheduleViewSync() {
@@ -394,12 +392,16 @@ export const useChatStore = defineStore('chat', () => {
 			request,
 			async (response: GraphNodeResponse) => {
 				if (response.error) return;
+				if (sessionState.lastRequest)
+					sessionState.lastRequest.threadId = response.threadId;
 				if (response.eventType === GraphEventType.FINAL_ANSWER) {
 					finalReply = response.text?.trim() || null;
 					return;
 				}
-				if (sessionState.lastRequest)
-					sessionState.lastRequest.threadId = response.threadId;
+				if (response.eventType === GraphEventType.HUMAN_FEEDBACK_REQUIRED) {
+					awaitingHumanFeedback = true;
+					return;
+				}
 
 				const responseStepId =
 					response.stepId || `${response.nodeName}:${response.attempt || 1}`;
@@ -501,7 +503,7 @@ export const useChatStore = defineStore('chat', () => {
 						.catch((e) => console.error(e));
 				}
 
-				if (requestOptions.value.humanFeedback && _rejectedPlan && !finalReply) {
+				if (awaitingHumanFeedback && !finalReply) {
 					showHumanFeedback.value = true;
 				} else {
 					sessionState.isStreaming = false;
@@ -571,7 +573,7 @@ export const useChatStore = defineStore('chat', () => {
 			rejectedPlan: rejected,
 			humanFeedbackContent: content || 'Accept',
 		};
-		await _sendGraphRequest(newRequest, rejected);
+		await _sendGraphRequest(newRequest);
 	}
 
 	// ── Report utils ────────────────────────────────────────────────────────────

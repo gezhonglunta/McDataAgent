@@ -16,6 +16,7 @@
 package com.alibaba.cloud.ai.dataagent.service.graph;
 
 import com.alibaba.cloud.ai.dataagent.service.langfuse.LangfuseService;
+import com.alibaba.cloud.ai.dataagent.enums.GraphEventType;
 import com.alibaba.cloud.ai.dataagent.enums.TextType;
 import com.alibaba.cloud.ai.dataagent.workflow.node.PlannerNode;
 import com.alibaba.cloud.ai.dataagent.dto.GraphRequest;
@@ -305,7 +306,8 @@ public class GraphServiceImpl implements GraphService {
 		log.info("Stream processing completed successfully for threadId: {}", threadId);
 		multiTurnContextManager.finishTurn(request.getConversationId());
 		RunnableConfig config = RunnableConfig.builder().threadId(threadId).build();
-		if (!isAwaitingHumanFeedback(request, config)) {
+		boolean awaitingHumanFeedback = isAwaitingHumanFeedback(request, config);
+		if (!awaitingHumanFeedback) {
 			releaseCheckpoint(config);
 		}
 		StreamContext context = streamContextMap.remove(threadId);
@@ -315,6 +317,17 @@ public class GraphServiceImpl implements GraphService {
 				langfuseReporter.endSpanSuccess(context.getSpan(), threadId, context.getCollectedOutput());
 			}
 			if (context.getSink() != null && context.getSink().currentSubscriberCount() > 0) {
+				if (awaitingHumanFeedback) {
+					context.getSink()
+						.tryEmitNext(ServerSentEvent
+							.builder(GraphNodeResponse.builder()
+								.agentId(agentId)
+								.threadId(threadId)
+								.eventType(GraphEventType.HUMAN_FEEDBACK_REQUIRED)
+								.textType(TextType.TEXT)
+								.build())
+							.build());
+				}
 				if (StringUtils.hasText(context.getFinalAnswer())) {
 					context.getSink()
 						.tryEmitNext(ServerSentEvent
@@ -411,7 +424,7 @@ public class GraphServiceImpl implements GraphService {
 	}
 
 	private boolean isAwaitingHumanFeedback(GraphRequest request, RunnableConfig config) {
-		if (!request.isHumanFeedback() || StringUtils.hasText(request.getHumanFeedbackContent())) {
+		if (!request.isHumanFeedback()) {
 			return false;
 		}
 		try {

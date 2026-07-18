@@ -19,6 +19,8 @@ public enum GraphEventType {
 
 	NODE_OUTPUT,
 
-	FINAL_ANSWER
+	FINAL_ANSWER,
+
+	HUMAN_FEEDBACK_REQUIRED
 
 }

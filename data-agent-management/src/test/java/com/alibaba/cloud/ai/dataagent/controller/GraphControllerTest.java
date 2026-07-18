@@ -16,6 +16,8 @@
 package com.alibaba.cloud.ai.dataagent.controller;
 
 import com.alibaba.cloud.ai.dataagent.dto.GraphRequest;
+import com.alibaba.cloud.ai.dataagent.enums.GraphEventType;
+import com.alibaba.cloud.ai.dataagent.enums.TextType;
 import com.alibaba.cloud.ai.dataagent.service.graph.GraphService;
 import com.alibaba.cloud.ai.dataagent.vo.GraphNodeResponse;
 import org.junit.jupiter.api.BeforeEach;
@@ -31,6 +33,8 @@ import org.springframework.http.server.reactive.ServerHttpResponse;
 import org.springframework.http.HttpHeaders;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Sinks;
+
+import java.time.Duration;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -110,6 +114,33 @@ class GraphControllerTest {
 		GraphRequest captured = requestCaptor.getValue();
 		assertTrue(captured.isNl2sqlOnly());
 		assertNull(captured.getThreadId());
+	}
+
+	@Test
+	void streamSearch_protocolEventWithoutText_isNotFilteredOut() {
+		doAnswer(invocation -> {
+			Sinks.Many<ServerSentEvent<GraphNodeResponse>> sink = invocation.getArgument(0);
+			sink.tryEmitNext(ServerSentEvent
+				.builder(GraphNodeResponse.builder()
+					.agentId("agent-1")
+					.threadId("run-1")
+					.eventType(GraphEventType.HUMAN_FEEDBACK_REQUIRED)
+					.textType(TextType.TEXT)
+					.build())
+				.build());
+			sink.tryEmitComplete();
+			return null;
+		}).when(graphService).graphStreamProcess(any(Sinks.Many.class), any(GraphRequest.class));
+
+		GraphNodeResponse response = graphController
+			.streamSearch("agent-1", "conversation-1", null, "review the plan", true, null, false, false,
+					serverHttpResponse)
+			.map(ServerSentEvent::data)
+			.blockFirst(Duration.ofSeconds(1));
+
+		assertNotNull(response);
+		assertEquals(GraphEventType.HUMAN_FEEDBACK_REQUIRED, response.getEventType());
+		assertNull(response.getText());
 	}
 
 	@Test
