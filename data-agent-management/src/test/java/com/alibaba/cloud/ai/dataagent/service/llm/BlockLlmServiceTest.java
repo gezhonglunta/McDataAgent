@@ -119,4 +119,16 @@ class BlockLlmServiceTest {
 		verify(requestSpec).advisors(any(Advisor[].class));
 	}
 
+	@Test
+	void call_structuredOutput_preservesSystemRoleAndUsesValidationAdvisor() {
+		Flux<ChatResponse> result = blockLlmService.call("system", "user", FeasibilityAssessmentOutputDTO.class);
+
+		StepVerifier.create(result)
+			.expectNextMatches(r -> ChatResponseUtil.getText(r).equals("test output"))
+			.verifyComplete();
+		verify(requestSpec).system("system");
+		verify(requestSpec).user("user");
+		verify(requestSpec).advisors(any(Advisor[].class));
+	}
+
 }

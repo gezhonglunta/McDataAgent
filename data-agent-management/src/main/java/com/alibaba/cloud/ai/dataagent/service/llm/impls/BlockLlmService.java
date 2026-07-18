@@ -22,6 +22,7 @@ import org.springframework.ai.chat.client.advisor.StructuredOutputValidationAdvi
 import org.springframework.ai.chat.model.ChatResponse;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 
 @AllArgsConstructor
 public class BlockLlmService implements LlmService {
@@ -32,6 +33,24 @@ public class BlockLlmService implements LlmService {
 	public Flux<ChatResponse> call(String system, String user) {
 		return Mono
 			.fromCallable(() -> registry.getChatClient().prompt().system(system).user(user).call().chatResponse())
+			.flux();
+	}
+
+	@Override
+	public Flux<ChatResponse> call(String system, String user, Class<?> outputType) {
+		StructuredOutputValidationAdvisor advisor = StructuredOutputValidationAdvisor.builder()
+			.outputType(outputType)
+			.maxRepeatAttempts(2)
+			.build();
+		return Mono
+			.fromCallable(() -> registry.getChatClient()
+				.prompt()
+				.system(system)
+				.user(user)
+				.advisors(advisor)
+				.call()
+				.chatResponse())
+			.subscribeOn(Schedulers.boundedElastic())
 			.flux();
 	}
 

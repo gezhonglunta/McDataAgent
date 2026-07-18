@@ -117,4 +117,17 @@ class StreamLlmServiceTest {
 		verify(requestSpec, never()).stream();
 	}
 
+	@Test
+	void call_structuredOutput_preservesSystemRoleAndUsesValidationAdvisor() {
+		Flux<ChatResponse> result = streamLlmService.call("system", "user", FeasibilityAssessmentOutputDTO.class);
+
+		StepVerifier.create(result)
+			.expectNextMatches(r -> ChatResponseUtil.getText(r).equals("streamed output"))
+			.verifyComplete();
+		verify(requestSpec).system("system");
+		verify(requestSpec).user("user");
+		verify(requestSpec).advisors(any(Advisor[].class));
+		verify(requestSpec).call();
+	}
+
 }

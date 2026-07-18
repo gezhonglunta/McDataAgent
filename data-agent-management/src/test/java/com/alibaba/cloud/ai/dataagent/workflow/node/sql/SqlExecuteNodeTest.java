@@ -50,7 +50,6 @@ import com.alibaba.cloud.ai.dataagent.service.nl2sql.Nl2SqlService;
 import com.alibaba.cloud.ai.dataagent.util.ChatResponseUtil;
 import com.alibaba.cloud.ai.dataagent.util.DatabaseUtil;
 import com.alibaba.cloud.ai.dataagent.util.JsonUtil;
-import com.alibaba.cloud.ai.dataagent.util.JsonParseUtil;
 import com.alibaba.cloud.ai.dataagent.workflow.node.SqlExecuteNode;
 import com.alibaba.cloud.ai.dataagent.properties.DataAgentProperties;
 import com.alibaba.cloud.ai.graph.GraphResponse;
@@ -100,16 +99,13 @@ class SqlExecuteNodeTest {
 	private DataAgentProperties properties;
 
 	@Mock
-	private JsonParseUtil jsonParseUtil;
-
-	@Mock
 	private Accessor accessor;
 
 	private SqlExecuteNode sqlExecuteNode;
 
 	@BeforeEach
 	void setUp() {
-		sqlExecuteNode = new SqlExecuteNode(databaseUtil, nl2SqlService, llmService, properties, jsonParseUtil);
+		sqlExecuteNode = new SqlExecuteNode(databaseUtil, nl2SqlService, llmService, properties);
 	}
 
 	private OverAllState createTestState() {
@@ -162,13 +158,27 @@ class SqlExecuteNodeTest {
 	}
 
 	private ResultBO extractResultSetPayload(String streamedText) throws Exception {
+		return extractResultSetPayloads(streamedText).get(0);
+	}
+
+	private List<ResultBO> extractResultSetPayloads(String streamedText) throws Exception {
 		String startSign = TextType.RESULT_SET.getStartSign();
-		int start = streamedText.indexOf(startSign);
-		assertTrue(start >= 0, "RESULT_SET start marker must be emitted");
-		start += startSign.length();
-		int end = streamedText.indexOf(TextType.RESULT_SET.getEndSign(), start);
-		assertTrue(end > start, "RESULT_SET end marker must be emitted");
-		return JsonUtil.getObjectMapper().readValue(streamedText.substring(start, end), ResultBO.class);
+		String endSign = TextType.RESULT_SET.getEndSign();
+		List<ResultBO> payloads = new ArrayList<>();
+		int offset = 0;
+		while (true) {
+			int start = streamedText.indexOf(startSign, offset);
+			if (start < 0) {
+				break;
+			}
+			start += startSign.length();
+			int end = streamedText.indexOf(endSign, start);
+			assertTrue(end > start, "RESULT_SET end marker must be emitted");
+			payloads.add(JsonUtil.getObjectMapper().readValue(streamedText.substring(start, end), ResultBO.class));
+			offset = end + endSign.length();
+		}
+		assertFalse(payloads.isEmpty(), "RESULT_SET start marker must be emitted");
+		return payloads;
 	}
 
 	private record SqlExecution(String streamedText, Map<String, Object> finalResult) {
@@ -301,17 +311,16 @@ class SqlExecuteNodeTest {
 		when(accessor.executeSqlAndReturnObject(any(), any())).thenReturn(resultSetBO);
 		when(properties.isEnableSqlResultChart()).thenReturn(true);
 		when(properties.getEnrichSqlResultTimeout()).thenReturn(1000L);
-		when(llmService.call(anyString(), anyString()))
+		when(llmService.call(anyString(), anyString(), eq(DisplayStyleBO.class)))
 			.thenReturn(Flux.just(ChatResponseUtil.createPureResponse("{\"type\":\"bar\"}")));
 		when(llmService.toStringFlux(any())).thenCallRealMethod();
-		DisplayStyleBO displayStyle = DisplayStyleBO.builder().type("bar").title("Users").build();
-		when(jsonParseUtil.tryConvertToObject(anyString(), eq(DisplayStyleBO.class))).thenReturn(displayStyle);
 
 		SqlExecution execution = subscribeToExecution(state);
-		ResultBO payload = extractResultSetPayload(execution.streamedText());
+		List<ResultBO> payloads = extractResultSetPayloads(execution.streamedText());
 
-		assertEquals(resultSetBO, payload.getResultSet());
-		assertEquals("bar", payload.getDisplayStyle().getType());
+		assertEquals(resultSetBO, payloads.get(0).getResultSet());
+		assertEquals("table", payloads.get(0).getDisplayStyle().getType());
+		assertEquals("bar", payloads.get(payloads.size() - 1).getDisplayStyle().getType());
 		assertEquals(SqlRetryDto.empty(), execution.finalResult().get(SQL_REGENERATE_REASON));
 	}
 
@@ -327,7 +336,7 @@ class SqlExecuteNodeTest {
 		when(accessor.executeSqlAndReturnObject(any(), any())).thenReturn(resultSetBO);
 		when(properties.isEnableSqlResultChart()).thenReturn(true);
 		when(properties.getEnrichSqlResultTimeout()).thenReturn(1L);
-		when(llmService.call(anyString(), anyString())).thenReturn(Flux.never());
+		when(llmService.call(anyString(), anyString(), eq(DisplayStyleBO.class))).thenReturn(Flux.never());
 		when(llmService.toStringFlux(any())).thenCallRealMethod();
 
 		SqlExecution execution = subscribeToExecution(state);
@@ -337,6 +346,36 @@ class SqlExecuteNodeTest {
 		assertEquals("table", payload.getDisplayStyle().getType());
 		assertEquals(SqlRetryDto.empty(), execution.finalResult().get(SQL_REGENERATE_REASON));
 		assertFalse(execution.streamedText().contains("SQL执行失败"));
+	}
+
+	@Test
+	@SuppressWarnings("unchecked")
+	void apply_slowChartGeneration_emitsTableResultBeforeChartCompletes() throws Exception {
+		OverAllState state = createTestState();
+		setupBasicState(state);
+		setupBasicMocks();
+
+		ResultSetBO resultSetBO = new ResultSetBO();
+		resultSetBO.setData(new ArrayList<>(List.of(Map.of("name", "Alice"))));
+		when(accessor.executeSqlAndReturnObject(any(), any())).thenReturn(resultSetBO);
+		when(properties.isEnableSqlResultChart()).thenReturn(true);
+		when(properties.getEnrichSqlResultTimeout()).thenReturn(5000L);
+		when(llmService.call(anyString(), anyString(), eq(DisplayStyleBO.class))).thenReturn(Flux.never());
+		when(llmService.toStringFlux(any())).thenCallRealMethod();
+
+		Map<String, Object> result = sqlExecuteNode.apply(state);
+		Flux<GraphResponse<StreamingOutput>> generator = (Flux<GraphResponse<StreamingOutput>>) result
+			.get(SQL_EXECUTE_NODE_OUTPUT);
+		GraphResponse<StreamingOutput> response = generator
+			.filter(item -> !item.isDone() && !item.isError()
+					&& item.getOutput().join().chunk().contains("\"displayStyle\""))
+			.next()
+			.block(Duration.ofSeconds(1));
+
+		assertNotNull(response);
+		ResultBO payload = JsonUtil.getObjectMapper().readValue(response.getOutput().join().chunk(), ResultBO.class);
+		assertEquals(resultSetBO, payload.getResultSet());
+		assertEquals("table", payload.getDisplayStyle().getType());
 	}
 
 	@Test
@@ -359,7 +398,7 @@ class SqlExecuteNodeTest {
 		assertEquals(resultSetBO, payload.getResultSet());
 		assertEquals("table", payload.getDisplayStyle().getType());
 		assertEquals(SqlRetryDto.empty(), execution.finalResult().get(SQL_REGENERATE_REASON));
-		verifyNoInteractions(llmService, jsonParseUtil);
+		verifyNoInteractions(llmService);
 	}
 
 	@Test

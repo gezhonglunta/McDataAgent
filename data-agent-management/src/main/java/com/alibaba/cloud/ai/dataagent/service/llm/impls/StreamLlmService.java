@@ -35,6 +35,24 @@ public class StreamLlmService implements LlmService {
 	}
 
 	@Override
+	public Flux<ChatResponse> call(String system, String user, Class<?> outputType) {
+		StructuredOutputValidationAdvisor advisor = StructuredOutputValidationAdvisor.builder()
+			.outputType(outputType)
+			.maxRepeatAttempts(2)
+			.build();
+		return Mono
+			.fromCallable(() -> registry.getChatClient()
+				.prompt()
+				.system(system)
+				.user(user)
+				.advisors(advisor)
+				.call()
+				.chatResponse())
+			.subscribeOn(Schedulers.boundedElastic())
+			.flux();
+	}
+
+	@Override
 	public Flux<ChatResponse> callSystem(String system) {
 		return registry.getChatClient().prompt().system(system).stream().chatResponse();
 	}

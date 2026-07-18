@@ -23,6 +23,12 @@ public interface LlmService {
 
 	Flux<ChatResponse> call(String system, String user);
 
+	/**
+	 * Call the model with system and user messages plus Spring AI structured-output
+	 * validation.
+	 */
+	Flux<ChatResponse> call(String system, String user, Class<?> outputType);
+
 	Flux<ChatResponse> callSystem(String system);
 
 	Flux<ChatResponse> callUser(String user);
