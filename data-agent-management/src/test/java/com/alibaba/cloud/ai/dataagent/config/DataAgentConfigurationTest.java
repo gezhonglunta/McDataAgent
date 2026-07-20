@@ -17,7 +17,6 @@ package com.alibaba.cloud.ai.dataagent.config;
 
 import com.alibaba.cloud.ai.dataagent.service.code.CodePoolExecutorServiceFactory;
 import com.alibaba.cloud.ai.dataagent.service.file.FileStorageServiceFactory;
-import com.alibaba.cloud.ai.dataagent.service.llm.LlmServiceFactory;
 import com.alibaba.cloud.ai.graph.CompileConfig;
 import com.alibaba.cloud.ai.graph.RunnableConfig;
 import com.alibaba.cloud.ai.graph.checkpoint.BaseCheckpointSaver;
@@ -36,7 +35,6 @@ class DataAgentConfigurationTest {
 
 	@Test
 	void runtimeServiceFactories_arePlainSelectorsInsteadOfSpringFactoryBeans() {
-		assertThat(FactoryBean.class.isAssignableFrom(LlmServiceFactory.class)).isFalse();
 		assertThat(FactoryBean.class.isAssignableFrom(FileStorageServiceFactory.class)).isFalse();
 		assertThat(FactoryBean.class.isAssignableFrom(CodePoolExecutorServiceFactory.class)).isFalse();
 	}

@@ -66,7 +66,7 @@ public class EvidenceRecallNode implements NodeAction {
 		String agentId = StateUtil.getStringValue(state, AGENT_ID);
 		Assert.hasText(agentId, "Agent ID cannot be empty.");
 
-		log.info("Rewriting query before getting evidence in question: {}", question);
+		log.debug("Rewriting query before getting evidence in question: {}", question);
 		log.debug("Agent ID: {}", agentId);
 
 		String multiTurn = StateUtil.getStringValue(state, MULTI_TURN_CONTEXT, "(无)");
@@ -124,7 +124,7 @@ public class EvidenceRecallNode implements NodeAction {
 			// 构建证据内容
 			String evidence = buildFormattedEvidenceContent(retrievalResult.businessTermDocuments(),
 					retrievalResult.agentKnowledgeDocuments());
-			log.info("Evidence content built as follows \n {} \n", evidence);
+			log.debug("Evidence content built as follows \n {} \n", evidence);
 			// 输出证据内容
 			outputEvidenceContent(retrievalResult.allDocuments(), sink);
 
@@ -350,7 +350,7 @@ public class EvidenceRecallNode implements NodeAction {
 		try {
 			String content = MarkdownParserUtil.extractText(llmOutput.trim());
 			evidenceQueryRewriteDTO = jsonParseUtil.tryConvertToObject(content, EvidenceQueryRewriteDTO.class);
-			log.info("For getting evidence, successfully parsed EvidenceQueryRewriteDTO from LLM response: {}",
+			log.debug("For getting evidence, successfully parsed EvidenceQueryRewriteDTO from LLM response: {}",
 					evidenceQueryRewriteDTO);
 			return evidenceQueryRewriteDTO.getStandaloneQuery();
 		}

@@ -106,7 +106,7 @@ public class ReportGeneratorNode implements NodeAction {
 		// Use utility class to create streaming generator with content collection
 		Flux<GraphResponse<StreamingOutput>> generator = FluxUtil.createStreamingGeneratorWithMessages(this.getClass(),
 				state, "开始生成报告...", "报告生成完成！", reportContent -> {
-					log.info("Generated report content: {}", reportContent);
+					log.debug("Generated report content: {}", reportContent);
 					Map<String, Object> result = new HashMap<>();
 					result.put(RESULT, reportContent);
 					result.put(SQL_EXECUTE_NODE_OUTPUT, null);

@@ -51,7 +51,7 @@ public class SqlGenerateDispatcher implements EdgeAction {
 			return END;
 		}
 		String sqlGenerateOutput = (String) optional.get();
-		log.info("SQL 生成结果: {}", sqlGenerateOutput);
+		log.debug("SQL 生成结果: {}", sqlGenerateOutput);
 
 		if (END.equals(sqlGenerateOutput)) {
 			log.info("检测到流程结束标志: {}", END);

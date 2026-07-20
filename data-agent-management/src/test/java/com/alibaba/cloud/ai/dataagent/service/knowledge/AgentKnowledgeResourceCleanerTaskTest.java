@@ -53,7 +53,7 @@ class AgentKnowledgeResourceCleanerTaskTest {
 
 		task.cleanupZombieResources();
 
-		verify(resourceManager, never()).deleteFromVectorStore(any(), any());
+		verify(resourceManager, never()).cleanupResources(any());
 	}
 
 	@Test
@@ -63,8 +63,7 @@ class AgentKnowledgeResourceCleanerTaskTest {
 		knowledge.setAgentId(10);
 
 		when(mapper.selectDirtyRecords(any(LocalDateTime.class), anyInt())).thenReturn(List.of(knowledge));
-		when(resourceManager.deleteFromVectorStore(10, 1)).thenReturn(true);
-		when(resourceManager.deleteKnowledgeFile(knowledge)).thenReturn(true);
+		when(resourceManager.cleanupResources(knowledge)).thenReturn(true);
 
 		task.cleanupZombieResources();
 
@@ -79,8 +78,7 @@ class AgentKnowledgeResourceCleanerTaskTest {
 		knowledge.setAgentId(10);
 
 		when(mapper.selectDirtyRecords(any(LocalDateTime.class), anyInt())).thenReturn(List.of(knowledge));
-		when(resourceManager.deleteFromVectorStore(10, 1)).thenReturn(true);
-		when(resourceManager.deleteKnowledgeFile(knowledge)).thenReturn(false);
+		when(resourceManager.cleanupResources(knowledge)).thenReturn(false);
 
 		task.cleanupZombieResources();
 
@@ -97,9 +95,8 @@ class AgentKnowledgeResourceCleanerTaskTest {
 		k2.setAgentId(10);
 
 		when(mapper.selectDirtyRecords(any(LocalDateTime.class), anyInt())).thenReturn(List.of(k1, k2));
-		when(resourceManager.deleteFromVectorStore(10, 1)).thenThrow(new RuntimeException("error"));
-		when(resourceManager.deleteFromVectorStore(10, 2)).thenReturn(true);
-		when(resourceManager.deleteKnowledgeFile(k2)).thenReturn(true);
+		when(resourceManager.cleanupResources(k1)).thenThrow(new RuntimeException("error"));
+		when(resourceManager.cleanupResources(k2)).thenReturn(true);
 
 		task.cleanupZombieResources();
 

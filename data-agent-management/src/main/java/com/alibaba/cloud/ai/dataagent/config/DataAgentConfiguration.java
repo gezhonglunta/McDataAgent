@@ -25,8 +25,9 @@ import com.alibaba.cloud.ai.dataagent.service.code.docker.DockerExecutorFactory;
 import com.alibaba.cloud.ai.dataagent.service.file.FileStorageService;
 import com.alibaba.cloud.ai.dataagent.service.file.FileStorageServiceFactory;
 import com.alibaba.cloud.ai.dataagent.service.llm.LlmService;
-import com.alibaba.cloud.ai.dataagent.service.llm.LlmServiceFactory;
+import com.alibaba.cloud.ai.dataagent.service.llm.impls.StreamLlmService;
 import com.alibaba.cloud.ai.dataagent.service.vectorstore.SimpleVectorStoreInitialization;
+import com.alibaba.cloud.ai.dataagent.service.vectorstore.MetadataAwareSimpleVectorStore;
 import com.alibaba.cloud.ai.dataagent.splitter.SentenceSplitter;
 import com.alibaba.cloud.ai.transformer.splitter.RecursiveCharacterTextSplitter;
 import com.alibaba.cloud.ai.dataagent.splitter.SemanticTextSplitter;
@@ -114,8 +115,8 @@ public class DataAgentConfiguration implements DisposableBean {
 
 	@Bean
 	@ConditionalOnMissingBean(LlmService.class)
-	public LlmService llmService(DataAgentProperties properties, AiModelRegistry aiModelRegistry) {
-		return new LlmServiceFactory(properties, aiModelRegistry).getObject();
+	public LlmService llmService(AiModelRegistry aiModelRegistry) {
+		return new StreamLlmService(aiModelRegistry);
 	}
 
 	@Bean
@@ -349,7 +350,7 @@ public class DataAgentConfiguration implements DisposableBean {
 	@ConditionalOnMissingBean(VectorStore.class)
 	@ConditionalOnProperty(name = "spring.ai.vectorstore.type", havingValue = "simple", matchIfMissing = true)
 	public SimpleVectorStore simpleVectorStore(EmbeddingModel embeddingModel) {
-		return SimpleVectorStore.builder(embeddingModel).build();
+		return new MetadataAwareSimpleVectorStore(embeddingModel);
 	}
 
 	@Bean

@@ -37,7 +37,6 @@ spring:
           table-similarity-threshold: 0.2
           default-topk-limit: 8
           default-similarity-threshold: 0.4
-        llm-service-type: stream
         code-executor:
           # 运行Python代码的环境（生产环境建议使用docker，不建议使用local）
           code-pool-executor: local
@@ -78,7 +77,7 @@ mybatis:
 # 日志配置
 logging:
   level:
-    com.alibaba.cloud.ai.dataagent.service: debug
-    com.alibaba.cloud.ai.dataagent.workflow.node: debug
-    com.alibaba.cloud.ai.mapper: debug
-    org.springframework.jdbc: debug
+    com.alibaba.cloud.ai.dataagent.service: info
+    com.alibaba.cloud.ai.dataagent.workflow.node: info
+    com.alibaba.cloud.ai.mapper: info
+    org.springframework.jdbc: info

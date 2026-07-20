@@ -90,7 +90,8 @@ CREATE TABLE IF NOT EXISTS agent_knowledge (
   PRIMARY KEY (id),
   INDEX idx_agent_knowledge_agent_id_status (agent_id, is_recall),
   INDEX idx_agent_knowledge_embedding_status (embedding_status),
-  INDEX idx_agent_knowledge_is_deleted (is_deleted)
+  INDEX idx_agent_knowledge_is_deleted (is_deleted),
+  CONSTRAINT fk_agent_knowledge_agent FOREIGN KEY (agent_id) REFERENCES agent(id) ON DELETE CASCADE
 ) ENGINE = InnoDB COMMENT = '智能体知识表';
 
 -- 数据源表

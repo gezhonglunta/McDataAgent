@@ -57,8 +57,8 @@ modified_mcp_config.json
 .idea/LocalCodeIndex/
 
 uploads/*
-vectorstore/*
-**/vectorstore/
+/vectorstore/
+/data-agent-management/vectorstore/
 .java-version
 
 # spring-ai-alibaba source

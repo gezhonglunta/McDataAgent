@@ -1,5 +1,5 @@
 /*
- * Copyright 2024-2026 the original author or authors.
+ * Copyright 2026 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,10 +13,23 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.alibaba.cloud.ai.dataagent.service.llm;
+package com.alibaba.cloud.ai.dataagent.bo;
 
-public enum LlmServiceEnum {
+import org.junit.jupiter.api.Test;
 
-	BLOCK, STREAM
+import static org.junit.jupiter.api.Assertions.assertFalse;
+
+class DbConfigBOTest {
+
+	@Test
+	void toString_excludesPassword() {
+		DbConfigBO config = DbConfigBO.builder()
+			.url("jdbc:test")
+			.username("user")
+			.password("sensitive-password")
+			.build();
+
+		assertFalse(config.toString().contains("sensitive-password"));
+	}
 
 }

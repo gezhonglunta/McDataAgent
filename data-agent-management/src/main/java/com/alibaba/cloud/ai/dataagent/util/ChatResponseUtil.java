@@ -15,7 +15,6 @@
  */
 package com.alibaba.cloud.ai.dataagent.util;
 
-import com.alibaba.cloud.ai.dataagent.enums.TextType;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.model.Generation;
@@ -35,12 +34,6 @@ public class ChatResponseUtil {
 		AssistantMessage assistantMessage = new AssistantMessage(message);
 		Generation generation = new Generation(assistantMessage);
 		return new ChatResponse(List.of(generation));
-	}
-
-	// 这样无法达到效果，先弃用。如果不得不需要这个逻辑，再重新定义
-	@Deprecated
-	public static ChatResponse createTrimResponse(String message, TextType textType) {
-		return createPureResponse(message.replace(textType.getStartSign(), "").replace(textType.getEndSign(), ""));
 	}
 
 	public static String getText(ChatResponse chatResponse) {

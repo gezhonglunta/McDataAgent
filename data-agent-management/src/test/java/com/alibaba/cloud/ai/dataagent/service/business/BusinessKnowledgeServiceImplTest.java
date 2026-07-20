@@ -225,10 +225,11 @@ class BusinessKnowledgeServiceImplTest {
 	@Test
 	void deleteKnowledge_found() {
 		when(businessKnowledgeMapper.selectById(1L)).thenReturn(testKnowledge);
+		when(agentVectorStoreService.deleteDocumentsByMetadata(anyString(), anyMap())).thenReturn(true);
 		when(businessKnowledgeMapper.logicalDelete(1L, 1)).thenReturn(1);
 
 		service.deleteKnowledge(1L);
-		verify(agentVectorStoreService).deleteDocumentsByMetedata(anyString(), anyMap());
+		verify(agentVectorStoreService).deleteDocumentsByMetadata(anyString(), anyMap());
 	}
 
 	@Test
@@ -241,6 +242,7 @@ class BusinessKnowledgeServiceImplTest {
 	@Test
 	void deleteKnowledge_logicalDeleteFails_throws() {
 		when(businessKnowledgeMapper.selectById(1L)).thenReturn(testKnowledge);
+		when(agentVectorStoreService.deleteDocumentsByMetadata(anyString(), anyMap())).thenReturn(true);
 		when(businessKnowledgeMapper.logicalDelete(1L, 1)).thenReturn(0);
 
 		assertThrows(RuntimeException.class, () -> service.deleteKnowledge(1L));

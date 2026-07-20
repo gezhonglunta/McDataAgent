@@ -127,7 +127,7 @@ public enum BizDataSourceTypeEnum {
 
 	public static BizDataSourceTypeEnum fromCode(Integer code) {
 		for (BizDataSourceTypeEnum type : values()) {
-			if (type.getCode() == code) {
+			if (type.getCode().equals(code)) {
 				return type;
 			}
 		}

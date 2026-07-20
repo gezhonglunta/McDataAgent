@@ -117,7 +117,7 @@ public class PythonGenerateNode implements NodeAction {
 					aiResponse = aiResponse.substring(TextType.PYTHON.getStartSign().length(),
 							aiResponse.length() - TextType.PYTHON.getEndSign().length());
 					aiResponse = MarkdownParserUtil.extractRawText(aiResponse);
-					log.info("Python Generate Code: {}", aiResponse);
+					log.debug("Python Generate Code: {}", aiResponse);
 					return Map.of(PYTHON_GENERATE_NODE_OUTPUT, aiResponse, PYTHON_TRIES_COUNT, triesCount + 1);
 				},
 				Flux.concat(Flux.just(ChatResponseUtil.createPureResponse(TextType.PYTHON.getStartSign())),

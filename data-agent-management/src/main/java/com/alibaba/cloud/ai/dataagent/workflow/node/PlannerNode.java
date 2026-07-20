@@ -54,7 +54,7 @@ public class PlannerNode implements NodeAction {
 		// 是否为NL2SQL模式
 		Boolean onlyNl2sql = state.value(IS_ONLY_NL2SQL, false);
 
-		Flux<ChatResponse> flux = onlyNl2sql ? handleNl2SqlOnly() : handlePlanGenerate(state);
+		Flux<ChatResponse> flux = onlyNl2sql ? handleNl2SqlOnly(state) : handlePlanGenerate(state);
 
 		Flux<ChatResponse> chatResponseFlux = Flux.concat(
 				Flux.just(ChatResponseUtil.createPureResponse(TextType.JSON.getStartSign())), flux,
@@ -70,12 +70,12 @@ public class PlannerNode implements NodeAction {
 	private Flux<ChatResponse> handlePlanGenerate(OverAllState state) {
 		// 获取查询增强节点的输出
 		String canonicalQuery = StateUtil.getCanonicalQuery(state);
-		log.info("Using processed query for planning: {}", canonicalQuery);
+		log.debug("Using processed query for planning: {}", canonicalQuery);
 
 		// 检查是否为修复模式
 		String validationError = StateUtil.getStringValue(state, PLAN_VALIDATION_ERROR, null);
 		if (validationError != null) {
-			log.info("Regenerating plan with user feedback: {}", validationError);
+			log.debug("Regenerating plan with user feedback: {}", validationError);
 		}
 		else {
 			log.info("Generating initial plan");
@@ -103,8 +103,8 @@ public class PlannerNode implements NodeAction {
 		return llmService.callUser(plannerPrompt);
 	}
 
-	private Flux<ChatResponse> handleNl2SqlOnly() {
-		return Flux.just(ChatResponseUtil.createPureResponse(Plan.nl2SqlPlan()));
+	private Flux<ChatResponse> handleNl2SqlOnly(OverAllState state) {
+		return Flux.just(ChatResponseUtil.createPureResponse(Plan.nl2SqlPlan(StateUtil.getCanonicalQuery(state))));
 	}
 
 	private String buildUserPrompt(String input, String validationError, OverAllState state) {

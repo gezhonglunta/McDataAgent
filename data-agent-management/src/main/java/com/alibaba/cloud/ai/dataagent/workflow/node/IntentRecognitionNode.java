@@ -56,7 +56,7 @@ public class IntentRecognitionNode implements NodeAction {
 
 		// 获取用户输入
 		String userInput = StateUtil.getStringValue(state, INPUT_KEY);
-		log.info("User input for intent recognition: {}", userInput);
+		log.debug("User input for intent recognition: {}", userInput);
 
 		String multiTurn = StateUtil.getStringValue(state, MULTI_TURN_CONTEXT, "(无)");
 

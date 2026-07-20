@@ -16,7 +16,6 @@
 package com.alibaba.cloud.ai.dataagent.config;
 
 import com.alibaba.cloud.ai.dataagent.properties.CodeExecutorProperties;
-import com.alibaba.cloud.ai.dataagent.properties.DataAgentProperties;
 import com.alibaba.cloud.ai.dataagent.properties.FileStorageProperties;
 import com.alibaba.cloud.ai.dataagent.properties.OssStorageProperties;
 import com.alibaba.cloud.ai.dataagent.service.aimodelconfig.AiModelRegistry;
@@ -46,7 +45,7 @@ class VectorStoreConfigurationTest {
 
 	@Test
 	void replaceableRuntimeServices_areConditionalOnMissingBean() throws Exception {
-		assertConditional("llmService", DataAgentProperties.class, AiModelRegistry.class);
+		assertConditional("llmService", AiModelRegistry.class);
 		assertConditional("fileStorageService", FileStorageProperties.class, OssStorageProperties.class);
 		assertConditional("codePoolExecutorService", CodeExecutorProperties.class, LlmService.class,
 				DockerExecutorFactory.class);

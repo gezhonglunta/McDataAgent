@@ -128,13 +128,6 @@ public class AgentStartupInitialization implements ApplicationRunner, Disposable
 							e.getMessage());
 				}
 
-				try {
-					Thread.sleep(1000);
-				}
-				catch (InterruptedException e) {
-					Thread.currentThread().interrupt();
-					break;
-				}
 			}
 
 			log.info("Agent initialization completed. Success: {}, Failed: {}, Total: {}", successCount, failureCount,
@@ -155,16 +148,18 @@ public class AgentStartupInitialization implements ApplicationRunner, Disposable
 		try {
 			Long agentId = agent.getId();
 
-			boolean hasData = isAlreadyInitialized(agentId);
-
-			if (hasData) {
-				log.info("Agent {} already has vector data , skipping initialization", agentId);
-				return true;
+			AgentDatasource activeDatasource = agentDatasourceService.getCurrentAgentDatasource(agentId);
+			if (activeDatasource == null) {
+				log.warn("Agent {} has no active datasource", agentId);
+				return false;
 			}
 
-			AgentDatasource activeDatasource = agentDatasourceService.getCurrentAgentDatasource(agentId);
-
 			Integer datasourceId = activeDatasource.getDatasourceId();
+			if (isAlreadyInitialized(datasourceId)) {
+				log.info("Datasource {} already has schema vector data, skipping initialization for agent {}",
+						datasourceId, agentId);
+				return true;
+			}
 
 			List<String> tables = activeDatasource.getSelectTables();
 
@@ -194,13 +189,13 @@ public class AgentStartupInitialization implements ApplicationRunner, Disposable
 		}
 	}
 
-	private boolean isAlreadyInitialized(Long agentId) {
+	private boolean isAlreadyInitialized(Integer datasourceId) {
 		try {
-			String agentIdStr = String.valueOf(agentId);
-			return agentVectorStoreService.hasDocuments(agentIdStr);
+			return agentVectorStoreService.hasSchemaDocuments(String.valueOf(datasourceId));
 		}
 		catch (Exception e) {
-			log.error("Failed to check initialization status for agent: {}, assuming not initialized", agentId, e);
+			log.error("Failed to check initialization status for datasource: {}, assuming not initialized",
+					datasourceId, e);
 			return false;
 		}
 	}

@@ -28,7 +28,6 @@ import java.util.List;
 
 public abstract class AbstractJdbcDdl implements Ddl {
 
-	@Deprecated
 	public abstract List<DatabaseInfoBO> showDatabases(Connection connection);
 
 	public abstract List<SchemaInfoBO> showSchemas(Connection connection);

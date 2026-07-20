@@ -17,121 +17,39 @@ package com.alibaba.cloud.ai.dataagent.connector.pool;
 
 import com.alibaba.cloud.ai.dataagent.bo.DbConfigBO;
 import com.alibaba.cloud.ai.dataagent.enums.ErrorCodeEnum;
-import org.junit.jupiter.api.BeforeEach;
+import java.sql.Connection;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 
-import java.sql.Connection;
-import java.util.Arrays;
-import java.util.Collections;
-
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class DBConnectionPoolFactoryTest {
 
-	private DBConnectionPoolFactory factory;
+	@Test
+	void resolvesPoolFromPrebuiltDatasourceTypeIndex() {
+		DBConnectionPool mysql = new StubDBConnectionPool("mysql");
+		DBConnectionPool h2 = new StubDBConnectionPool("h2");
+		DBConnectionPoolFactory factory = new DBConnectionPoolFactory(List.of(mysql, h2));
 
-	private DBConnectionPool jdbcPool;
-
-	private DBConnectionPool memoryPool;
-
-	@BeforeEach
-	void setUp() {
-		jdbcPool = new StubDBConnectionPool("jdbc", "mysql", "postgresql");
-		memoryPool = new StubDBConnectionPool("in-memory", "h2");
-		factory = new DBConnectionPoolFactory(Arrays.asList(jdbcPool, memoryPool));
+		assertEquals(mysql, factory.getPoolByDbType("mysql"));
+		assertEquals(h2, factory.getPoolByDbType("h2"));
 	}
 
 	@Test
-	void getPoolByType_returnsDirectMatch() {
-		DBConnectionPool result = factory.getPoolByType("jdbc");
-		assertEquals(jdbcPool, result);
+	void unknownPool_failsClearly() {
+		DBConnectionPoolFactory factory = new DBConnectionPoolFactory(List.of());
+
+		assertThrows(IllegalStateException.class, () -> factory.getPoolByDbType("unknown"));
 	}
 
 	@Test
-	void getPoolByType_returnsDirectMatchForMemory() {
-		DBConnectionPool result = factory.getPoolByType("in-memory");
-		assertEquals(memoryPool, result);
+	void duplicatePool_failsAtStartup() {
+		assertThrows(IllegalStateException.class, () -> new DBConnectionPoolFactory(
+				List.of(new StubDBConnectionPool("mysql"), new StubDBConnectionPool("mysql"))));
 	}
 
-	@Test
-	void getPoolByType_fallsBackToSupportedDataSourceType() {
-		DBConnectionPool result = factory.getPoolByType("mysql");
-		assertEquals(jdbcPool, result);
-	}
-
-	@Test
-	void getPoolByType_returnsNullWhenNotFound() {
-		DBConnectionPool result = factory.getPoolByType("unknown");
-		assertNull(result);
-	}
-
-	@Test
-	void getPoolByDbType_returnsMatchingPool() {
-		DBConnectionPool result = factory.getPoolByDbType("mysql");
-		assertEquals(jdbcPool, result);
-	}
-
-	@Test
-	void getPoolByDbType_returnsH2Pool() {
-		DBConnectionPool result = factory.getPoolByDbType("h2");
-		assertEquals(memoryPool, result);
-	}
-
-	@Test
-	void getPoolByDbType_throwsOnUnknownType() {
-		IllegalStateException ex = assertThrows(IllegalStateException.class, () -> factory.getPoolByDbType("unknown"));
-		assertTrue(ex.getMessage().contains("unknown"));
-	}
-
-	@Test
-	void isRegistered_returnsTrueForRegisteredType() {
-		assertTrue(factory.isRegistered("jdbc"));
-		assertTrue(factory.isRegistered("in-memory"));
-	}
-
-	@Test
-	void isRegistered_returnsFalseForUnregisteredType() {
-		assertFalse(factory.isRegistered("unknown"));
-		assertFalse(factory.isRegistered("mysql"));
-	}
-
-	@Test
-	void register_addsNewPool() {
-		DBConnectionPool newPool = new StubDBConnectionPool("sdk", "oracle");
-		factory.register(newPool);
-		assertTrue(factory.isRegistered("sdk"));
-		assertEquals(newPool, factory.getPoolByType("sdk"));
-	}
-
-	@Test
-	void constructor_withEmptyList_createsEmptyFactory() {
-		DBConnectionPoolFactory emptyFactory = new DBConnectionPoolFactory(Collections.emptyList());
-		assertFalse(emptyFactory.isRegistered("jdbc"));
-		assertNull(emptyFactory.getPoolByType("jdbc"));
-	}
-
-	@Test
-	void getPoolByType_prefersDirectMatchOverSupportedType() {
-		DBConnectionPool directPool = new StubDBConnectionPool("mysql", "mysql");
-		factory.register(directPool);
-		DBConnectionPool result = factory.getPoolByType("mysql");
-		assertEquals(directPool, result);
-	}
-
-	private static class StubDBConnectionPool implements DBConnectionPool {
-
-		private final String poolType;
-
-		private final String[] supportedTypes;
-
-		StubDBConnectionPool(String poolType, String... supportedTypes) {
-			this.poolType = poolType;
-			this.supportedTypes = supportedTypes;
-		}
+	private record StubDBConnectionPool(String type) implements DBConnectionPool {
 
 		@Override
 		public ErrorCodeEnum ping(DbConfigBO config) {
@@ -144,18 +62,13 @@ class DBConnectionPoolFactoryTest {
 		}
 
 		@Override
-		public boolean supportedDataSourceType(String type) {
-			for (String supported : supportedTypes) {
-				if (supported.equals(type)) {
-					return true;
-				}
-			}
-			return false;
+		public boolean supportedDataSourceType(String candidate) {
+			return type.equals(candidate);
 		}
 
 		@Override
 		public String getConnectionPoolType() {
-			return poolType;
+			return type;
 		}
 
 		@Override

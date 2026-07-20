@@ -20,9 +20,9 @@ import com.alibaba.cloud.ai.dataagent.enums.BizDataSourceTypeEnum;
 import org.springframework.stereotype.Component;
 
 import java.util.Arrays;
+import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * @author vlsmb
@@ -31,18 +31,22 @@ import java.util.concurrent.ConcurrentHashMap;
 @Component
 public class AccessorFactory {
 
+	private final Map<BizDataSourceTypeEnum, Accessor> accessorsByType;
+
 	public AccessorFactory(List<Accessor> accessors) {
-		accessors.forEach(this::register);
-	}
-
-	private final Map<String, Accessor> accessorMap = new ConcurrentHashMap<>();
-
-	public void register(Accessor accessor) {
-		accessorMap.put(accessor.getAccessorType(), accessor);
-	}
-
-	public boolean isRegistered(String type) {
-		return accessorMap.containsKey(type);
+		EnumMap<BizDataSourceTypeEnum, Accessor> index = new EnumMap<>(BizDataSourceTypeEnum.class);
+		for (BizDataSourceTypeEnum type : BizDataSourceTypeEnum.values()) {
+			List<Accessor> matching = accessors.stream()
+				.filter(accessor -> accessor.supportedDataSourceType(type))
+				.toList();
+			if (matching.size() > 1) {
+				throw new IllegalStateException("Multiple accessors registered for datasource type: " + type);
+			}
+			if (!matching.isEmpty()) {
+				index.put(type, matching.get(0));
+			}
+		}
+		this.accessorsByType = Map.copyOf(index);
 	}
 
 	public Accessor getAccessorByDbConfig(DbConfigBO dbConfig) {
@@ -58,17 +62,12 @@ public class AccessorFactory {
 		return getAccessorByDbTypeEnum(typeEnum);
 	}
 
-	// todo: 写一层缓存
 	public Accessor getAccessorByDbTypeEnum(BizDataSourceTypeEnum typeEnum) {
-		return accessorMap.values()
-			.stream()
-			.filter(a -> a.supportedDataSourceType(typeEnum.getTypeName()))
-			.findFirst()
-			.orElseThrow(() -> new IllegalStateException("no accessor registered for dialect: " + typeEnum));
-	}
-
-	public Accessor getAccessorByType(String type) {
-		return accessorMap.get(type);
+		Accessor accessor = accessorsByType.get(typeEnum);
+		if (accessor == null) {
+			throw new IllegalStateException("no accessor registered for datasource type: " + typeEnum);
+		}
+		return accessor;
 	}
 
 }

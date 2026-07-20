@@ -83,12 +83,15 @@ class ModelConfigDataServiceImplTest {
 		config.setModelName("gpt-4");
 		config.setModelType(ModelType.CHAT);
 		config.setBaseUrl("http://example.com");
-		config.setApiKey("key");
+		config.setApiKey("provider-secret-key");
+		config.setProxyPassword("proxy-secret");
 		config.setProvider("openai");
 		when(modelConfigMapper.findAll()).thenReturn(List.of(config));
 
 		List<ModelConfigDTO> result = service.listConfigs();
 		assertEquals(1, result.size());
+		assertEquals("****-key", result.get(0).getApiKey());
+		assertEquals("****", result.get(0).getProxyPassword());
 	}
 
 	@Test
@@ -176,6 +179,54 @@ class ModelConfigDataServiceImplTest {
 		ModelConfig result = service.updateConfigInDb(dto);
 
 		assertEquals("real-secret-key", result.getApiKey());
+	}
+
+	@Test
+	void updateConfigInDb_maskedProxyPassword_preservesOldPassword() {
+		ModelConfig existing = new ModelConfig();
+		existing.setId(1);
+		existing.setModelType(ModelType.CHAT);
+		existing.setApiKey("real-secret-key");
+		existing.setProxyPassword("real-proxy-password");
+		when(modelConfigMapper.findById(1)).thenReturn(existing);
+
+		ModelConfigDTO dto = new ModelConfigDTO();
+		dto.setId(1);
+		dto.setModelType("CHAT");
+		dto.setModelName("model");
+		dto.setBaseUrl("http://example.com");
+		dto.setApiKey("****-key");
+		dto.setProxyPassword("****");
+		dto.setProvider("openai");
+
+		ModelConfig result = service.updateConfigInDb(dto);
+
+		assertEquals("real-secret-key", result.getApiKey());
+		assertEquals("real-proxy-password", result.getProxyPassword());
+	}
+
+	@Test
+	void updateConfigInDb_newSecrets_replacesOldSecrets() {
+		ModelConfig existing = new ModelConfig();
+		existing.setId(1);
+		existing.setModelType(ModelType.CHAT);
+		existing.setApiKey("old-api-key");
+		existing.setProxyPassword("old-proxy-password");
+		when(modelConfigMapper.findById(1)).thenReturn(existing);
+
+		ModelConfigDTO dto = new ModelConfigDTO();
+		dto.setId(1);
+		dto.setModelType("CHAT");
+		dto.setModelName("model");
+		dto.setBaseUrl("http://example.com");
+		dto.setApiKey("new-api-key");
+		dto.setProxyPassword("new-proxy-password");
+		dto.setProvider("openai");
+
+		ModelConfig result = service.updateConfigInDb(dto);
+
+		assertEquals("new-api-key", result.getApiKey());
+		assertEquals("new-proxy-password", result.getProxyPassword());
 	}
 
 	@Test

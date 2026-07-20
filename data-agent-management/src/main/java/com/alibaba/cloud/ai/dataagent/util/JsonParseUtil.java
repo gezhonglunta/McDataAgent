@@ -70,7 +70,7 @@ public class JsonParseUtil {
 	 * @return 转换后的对象
 	 */
 	private <T> T tryConvertToObjectInternal(String json, JsonParserFunction<T> parser) {
-		log.info("Trying to convert JSON to object: {}", json);
+		log.debug("Trying to convert JSON to object: {}", json);
 		String currentJson = removeThinkTags(json);
 		Exception lastException = null;
 		ObjectMapper objectMapper = JsonUtil.getObjectMapper();
@@ -95,7 +95,7 @@ public class JsonParseUtil {
 
 				if (i == MAX_RETRY_COUNT - 1) {
 					log.error("Finally failed after {} fix attempts", MAX_RETRY_COUNT);
-					log.warn("Last fix result: {}", currentJson);
+					log.debug("Last fix result: {}", currentJson);
 				}
 			}
 		}

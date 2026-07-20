@@ -185,7 +185,7 @@ class DatasourceServiceImplTest {
 		when(handlerRegistry.getRequired("mysql")).thenReturn(typeHandler);
 		when(typeHandler.resolveConnectionUrl(ds)).thenReturn("jdbc:mysql://localhost/test");
 		when(typeHandler.normalizeTestUrl(any(), anyString())).thenReturn("jdbc:mysql://localhost/test");
-		when(poolFactory.getPoolByType("mysql")).thenReturn(dbConnectionPool);
+		when(poolFactory.getPoolByDbType("mysql")).thenReturn(dbConnectionPool);
 		when(dbConnectionPool.ping(any())).thenReturn(ErrorCodeEnum.SUCCESS);
 
 		assertTrue(datasourceService.testConnection(1));
@@ -199,7 +199,7 @@ class DatasourceServiceImplTest {
 		when(handlerRegistry.getRequired("mysql")).thenReturn(typeHandler);
 		when(typeHandler.resolveConnectionUrl(ds)).thenReturn("jdbc:mysql://localhost/test");
 		when(typeHandler.normalizeTestUrl(any(), anyString())).thenReturn("jdbc:mysql://localhost/test");
-		when(poolFactory.getPoolByType("mysql")).thenReturn(null);
+		when(poolFactory.getPoolByDbType("mysql")).thenReturn(null);
 
 		assertFalse(datasourceService.testConnection(1));
 		verify(datasourceMapper).updateTestStatusById(1, "failed");
@@ -430,7 +430,7 @@ class DatasourceServiceImplTest {
 		when(handlerRegistry.getRequired("mysql")).thenReturn(typeHandler);
 		when(typeHandler.resolveConnectionUrl(ds)).thenReturn("jdbc:mysql://localhost/test");
 		when(typeHandler.normalizeTestUrl(any(), anyString())).thenReturn("jdbc:mysql://localhost/test");
-		when(poolFactory.getPoolByType("mysql")).thenReturn(dbConnectionPool);
+		when(poolFactory.getPoolByDbType("mysql")).thenReturn(dbConnectionPool);
 		when(dbConnectionPool.ping(any())).thenReturn(ErrorCodeEnum.OTHERS);
 
 		assertFalse(datasourceService.testConnection(1));

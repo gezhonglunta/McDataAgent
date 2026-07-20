@@ -46,8 +46,8 @@ public class DatabaseUtil {
 		AgentDatasource activeDatasource = agentDatasourceService.getCurrentAgentDatasource(agentId);
 		// Convert to DbConfig
 		DbConfigBO dbConfig = datasourceService.getDbConfig(activeDatasource.getDatasource());
-		log.info("Successfully created DbConfig for agent {}: url={}, schema={}, type={}", agentId, dbConfig.getUrl(),
-				dbConfig.getSchema(), dbConfig.getDialectType());
+		log.info("Successfully created DbConfig for agent {}: schema={}, type={}", agentId, dbConfig.getSchema(),
+				dbConfig.getDialectType());
 
 		return dbConfig;
 	}

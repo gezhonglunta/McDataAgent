@@ -16,13 +16,18 @@
 package com.alibaba.cloud.ai.dataagent.service.agent;
 
 import com.alibaba.cloud.ai.dataagent.entity.Agent;
+import com.alibaba.cloud.ai.dataagent.entity.AgentKnowledge;
+import com.alibaba.cloud.ai.dataagent.mapper.AgentKnowledgeMapper;
 import com.alibaba.cloud.ai.dataagent.mapper.AgentMapper;
+import com.alibaba.cloud.ai.dataagent.security.ApiKeyCredentialService;
 import com.alibaba.cloud.ai.dataagent.service.file.FileStorageService;
+import com.alibaba.cloud.ai.dataagent.service.knowledge.AgentKnowledgeResourceManager;
 import com.alibaba.cloud.ai.dataagent.service.vectorstore.AgentVectorStoreService;
 import com.alibaba.cloud.ai.dataagent.util.ApiKeyUtil;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.HashMap;
@@ -41,6 +46,12 @@ public class AgentServiceImpl implements AgentService {
 	private final AgentVectorStoreService agentVectorStoreService;
 
 	private final FileStorageService fileStorageService;
+
+	private final ApiKeyCredentialService apiKeyCredentialService;
+
+	private final AgentKnowledgeMapper agentKnowledgeMapper;
+
+	private final AgentKnowledgeResourceManager agentKnowledgeResourceManager;
 
 	@Override
 	public List<Agent> findAll() {
@@ -89,52 +100,36 @@ public class AgentServiceImpl implements AgentService {
 	}
 
 	@Override
+	@Transactional
 	public void deleteById(Long id) {
-		try {
-			// 获取头像信息用于文件清理
-			Agent existing = agentMapper.findById(id);
-			String avatar = existing != null ? existing.getAvatar() : null;
-
-			// Delete agent record from database
-			agentMapper.deleteById(id);
-
-			// Also clean up the agent's vector data
-			if (agentVectorStoreService != null) {
-				try {
-					agentVectorStoreService.deleteDocumentsByMetedata(id.toString(), new HashMap<>());
-					log.info("Successfully deleted vector data for agent: {}", id);
-				}
-				catch (Exception vectorException) {
-					log.warn("Failed to delete vector data for agent: {}, error: {}", id, vectorException.getMessage());
-					// Vector data deletion failure does not affect the main process
-				}
+		Agent existing = requireAgent(id);
+		List<AgentKnowledge> knowledgeRecords = agentKnowledgeMapper.selectByAgentIdIncludeDeleted(id.intValue());
+		for (AgentKnowledge knowledge : knowledgeRecords) {
+			if (!agentKnowledgeResourceManager.cleanupResources(knowledge)) {
+				throw new IllegalStateException("Failed to clean resources for agent knowledge: " + knowledge.getId());
 			}
-
-			// 清理头像文件
-			try {
-				if (avatar != null && !avatar.isBlank()) {
-					fileStorageService.deleteFile(avatar);
-					log.info("Successfully deleted avatar file: {} for agent: {}", avatar, id);
-				}
-			}
-			catch (Exception avatarEx) {
-				log.warn("Failed to cleanup avatar file: {} for agent: {}, error: {}", avatar, id,
-						avatarEx.getMessage());
-			}
-
-			log.info("Successfully deleted agent: {}", id);
 		}
-		catch (Exception e) {
-			log.error("Failed to delete agent: {}", id, e);
-			throw e;
+
+		if (!Boolean.TRUE.equals(agentVectorStoreService.deleteDocumentsByMetadata(id.toString(), new HashMap<>()))) {
+			throw new IllegalStateException("Failed to clean vector resources for agent: " + id);
 		}
+		if (existing.getAvatar() != null && !existing.getAvatar().isBlank()
+				&& !fileStorageService.deleteFile(existing.getAvatar())) {
+			throw new IllegalStateException("Failed to delete avatar for agent: " + id);
+		}
+
+		agentKnowledgeMapper.deleteByAgentId(id.intValue());
+		if (agentMapper.deleteById(id) <= 0) {
+			throw new IllegalStateException("Failed to delete agent: " + id);
+		}
+		log.info("Successfully deleted agent and owned resources: {}", id);
 	}
 
 	@Override
 	public Agent generateApiKey(Long id) {
 		Agent agent = requireAgent(id);
 		String apiKey = ApiKeyUtil.generate();
-		agentMapper.updateApiKey(id, apiKey, 1);
+		agentMapper.updateApiKey(id, apiKeyCredentialService.encode(apiKey), 1);
 		agent.setApiKey(apiKey);
 		agent.setApiKeyEnabled(1);
 		return agent;
@@ -156,8 +151,11 @@ public class AgentServiceImpl implements AgentService {
 
 	@Override
 	public Agent toggleApiKey(Long id, boolean enabled) {
-		agentMapper.toggleApiKey(id, enabled ? 1 : 0);
 		Agent agent = requireAgent(id);
+		if (enabled && (agent.getApiKey() == null || agent.getApiKey().isBlank())) {
+			throw new IllegalStateException("Generate an API key before enabling API key authentication");
+		}
+		agentMapper.toggleApiKey(id, enabled ? 1 : 0);
 		agent.setApiKeyEnabled(enabled ? 1 : 0);
 		return agent;
 	}
@@ -169,7 +167,7 @@ public class AgentServiceImpl implements AgentService {
 		if (apiKey == null || apiKey.isBlank()) {
 			return null;
 		}
-		return ApiKeyUtil.mask(apiKey);
+		return apiKeyCredentialService.mask(apiKey);
 	}
 
 	private Agent requireAgent(Long id) {

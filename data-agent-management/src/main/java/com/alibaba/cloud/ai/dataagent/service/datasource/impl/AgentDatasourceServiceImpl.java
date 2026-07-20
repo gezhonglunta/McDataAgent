@@ -69,7 +69,8 @@ public class AgentDatasourceServiceImpl implements AgentDatasourceService {
 			schemaInitRequest.setDbConfig(dbConfig);
 			schemaInitRequest.setTables(tables);
 
-			log.info("Created SchemaInitRequest for agent: {}, dbConfig: {}, tables: {}", agentIdStr, dbConfig, tables);
+			log.info("Created SchemaInitRequest for agent: {}, datasource: {}, tableCount: {}", agentIdStr,
+					datasourceId, tables.size());
 
 			// Call the original initialization method
 			return schemaService.schema(datasourceId, schemaInitRequest);

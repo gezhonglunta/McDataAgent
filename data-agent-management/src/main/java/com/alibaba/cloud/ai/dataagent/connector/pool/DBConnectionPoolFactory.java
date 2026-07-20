@@ -17,9 +17,10 @@ package com.alibaba.cloud.ai.dataagent.connector.pool;
 
 import org.springframework.stereotype.Component;
 
+import com.alibaba.cloud.ai.dataagent.enums.BizDataSourceTypeEnum;
+import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * DB connection pool factory
@@ -27,40 +28,31 @@ import java.util.concurrent.ConcurrentHashMap;
 @Component
 public class DBConnectionPoolFactory {
 
-	private final Map<String, DBConnectionPool> poolMap = new ConcurrentHashMap<>();
+	private final Map<BizDataSourceTypeEnum, DBConnectionPool> poolsByType;
 
 	public DBConnectionPoolFactory(List<DBConnectionPool> pools) {
-		pools.forEach(this::register);
-	}
-
-	public void register(DBConnectionPool pool) {
-		poolMap.put(pool.getConnectionPoolType(), pool);
-	}
-
-	public boolean isRegistered(String type) {
-		return poolMap.containsKey(type);
-	}
-
-	/**
-	 * Get corresponding DB connection pool based on database type
-	 * @param type database type
-	 * @return DB connection pool
-	 */
-	public DBConnectionPool getPoolByType(String type) {
-		DBConnectionPool direct = poolMap.get(type);
-		if (direct != null) {
-			return direct;
+		EnumMap<BizDataSourceTypeEnum, DBConnectionPool> index = new EnumMap<>(BizDataSourceTypeEnum.class);
+		for (BizDataSourceTypeEnum type : BizDataSourceTypeEnum.values()) {
+			List<DBConnectionPool> matching = pools.stream()
+				.filter(pool -> pool.supportedDataSourceType(type.getTypeName()))
+				.toList();
+			if (matching.size() > 1) {
+				throw new IllegalStateException("Multiple connection pools registered for datasource type: " + type);
+			}
+			if (!matching.isEmpty()) {
+				index.put(type, matching.get(0));
+			}
 		}
-		return poolMap.values().stream().filter(p -> p.supportedDataSourceType(type)).findFirst().orElse(null);
+		this.poolsByType = Map.copyOf(index);
 	}
 
-	// todo: 写一层缓存
 	public DBConnectionPool getPoolByDbType(String type) {
-		return poolMap.values()
-			.stream()
-			.filter(p -> p.supportedDataSourceType(type))
-			.findFirst()
-			.orElseThrow(() -> new IllegalStateException("No DB connection pool found for type: " + type));
+		BizDataSourceTypeEnum datasourceType = BizDataSourceTypeEnum.fromTypeName(type);
+		DBConnectionPool pool = datasourceType == null ? null : poolsByType.get(datasourceType);
+		if (pool == null) {
+			throw new IllegalStateException("No DB connection pool found for type: " + type);
+		}
+		return pool;
 	}
 
 }

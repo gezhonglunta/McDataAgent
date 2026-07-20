@@ -107,6 +107,21 @@ class AbstractDBConnectionPoolTest {
 	}
 
 	@Test
+	void getConnection_differentPasswordsWithSameHash_doNotShareDataSource() throws Exception {
+		String url = String.format(H2_URL, nextDbId());
+		DbConfigBO first = DbConfigBO.builder().url(url).username("sa").password("Aa").connectionType("h2").build();
+		DbConfigBO second = DbConfigBO.builder().url(url).username("sa").password("BB").connectionType("h2").build();
+		assertEquals(first.getPassword().hashCode(), second.getPassword().hashCode());
+
+		try (Connection ignored = pool.getConnection(first)) {
+			assertNotNull(ignored);
+		}
+
+		assertThrows(RuntimeException.class, () -> pool.getConnection(second));
+		assertEquals(2, pool.getDataSourceCreationCount());
+	}
+
+	@Test
 	void getConnection_failingDataSource_retriesThreeTimesAndThrows() throws SQLException {
 		DataSource failingDataSource = mock(DataSource.class);
 		when(failingDataSource.getConnection()).thenThrow(new SQLException("unavailable"));

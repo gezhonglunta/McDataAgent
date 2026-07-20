@@ -31,7 +31,7 @@ public interface AgentVectorStoreService {
 
 	Boolean deleteDocumentsByVectorType(String agentId, String vectorType) throws Exception;
 
-	Boolean deleteDocumentsByMetedata(String agentId, Map<String, Object> metadata);
+	Boolean deleteDocumentsByMetadata(String agentId, Map<String, Object> metadata);
 
 	Boolean deleteDocumentsByMetadata(Map<String, Object> metadata);
 
@@ -45,7 +45,7 @@ public interface AgentVectorStoreService {
 	// 通过元数据过滤精确查找
 	List<Document> getDocumentsOnlyByFilter(Filter.Expression filterExpression, Integer topK);
 
-	boolean hasDocuments(String agentId);
+	boolean hasSchemaDocuments(String datasourceId);
 
 	void addDocuments(String agentId, List<Document> documents);
 

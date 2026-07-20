@@ -99,7 +99,7 @@ public class AgentVectorStoreServiceImpl implements AgentVectorStoreService {
 		Map<String, Object> metadata = new HashMap<>(Map.ofEntries(Map.entry(Constant.AGENT_ID, agentId),
 				Map.entry(DocumentMetadataConstant.VECTOR_TYPE, vectorType)));
 
-		return this.deleteDocumentsByMetedata(agentId, metadata);
+		return this.deleteDocumentsByMetadata(agentId, metadata);
 	}
 
 	@Override
@@ -136,7 +136,11 @@ public class AgentVectorStoreServiceImpl implements AgentVectorStoreService {
 		Assert.notNull(metadata, "Metadata cannot be null.");
 		String filterExpression = buildFilterExpressionString(metadata);
 
-		if (vectorStore instanceof SimpleVectorStore) {
+		if (vectorStore instanceof MetadataAwareSimpleVectorStore simpleVectorStore) {
+			int deleted = simpleVectorStore.deleteByMetadata(metadata);
+			log.info("Deleted {} documents by metadata from SimpleVectorStore", deleted);
+		}
+		else if (vectorStore instanceof SimpleVectorStore) {
 			batchDelDocumentsWithFilter(filterExpression);
 		}
 		else {
@@ -159,16 +163,20 @@ public class AgentVectorStoreServiceImpl implements AgentVectorStoreService {
 	}
 
 	@Override
-	public Boolean deleteDocumentsByMetedata(String agentId, Map<String, Object> metadata) {
+	public Boolean deleteDocumentsByMetadata(String agentId, Map<String, Object> metadata) {
 		Assert.hasText(agentId, "AgentId cannot be empty.");
 		Assert.notNull(metadata, "Metadata cannot be null.");
-		// 添加agentId元数据过滤条件, 用于删除指定agentId下的所有数据，因为metadata中用户调用可能忘记添加agentId
-		metadata.put(Constant.AGENT_ID, agentId);
-		String filterExpression = buildFilterExpressionString(metadata);
+		// 在内部副本中补充 agentId，兼容 Map.of 等不可变入参，也避免修改调用方状态
+		Map<String, Object> scopedMetadata = new HashMap<>(metadata);
+		scopedMetadata.put(Constant.AGENT_ID, agentId);
+		String filterExpression = buildFilterExpressionString(scopedMetadata);
 
-		// es的可以直接元数据删除
-		if (vectorStore instanceof SimpleVectorStore) {
-			// 目前SimpleVectorStore不支持通过元数据删除，使用会抛出UnsupportedOperationException,现在是通过id删除
+		if (vectorStore instanceof MetadataAwareSimpleVectorStore simpleVectorStore) {
+			int deleted = simpleVectorStore.deleteByMetadata(scopedMetadata);
+			log.info("Deleted {} documents for agent {} from SimpleVectorStore", deleted, agentId);
+		}
+		else if (vectorStore instanceof SimpleVectorStore) {
+			// Keep compatibility with user-supplied SimpleVectorStore beans.
 			batchDelDocumentsWithFilter(filterExpression);
 		}
 		else {
@@ -265,11 +273,11 @@ public class AgentVectorStoreServiceImpl implements AgentVectorStoreService {
 	}
 
 	@Override
-	public boolean hasDocuments(String agentId) {
+	public boolean hasSchemaDocuments(String datasourceId) {
 		// 类似 MySQL 的 LIMIT 1,只检查是否存在文档
 		List<Document> docs = vectorStore.similaritySearch(org.springframework.ai.vectorstore.SearchRequest.builder()
 			.query(DEFAULT)// 使用默认的查询字符串，因为有的嵌入模型不支持空字符串
-			.filterExpression(buildFilterExpressionString(Map.of(Constant.AGENT_ID, agentId)))
+			.filterExpression(buildFilterExpressionString(Map.of(Constant.DATASOURCE_ID, datasourceId)))
 			.topK(1) // 只获取1个文档
 			.similarityThreshold(0.0)
 			.build());

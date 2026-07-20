@@ -21,6 +21,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
 
 import java.util.ArrayList;
+import java.time.Duration;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -34,10 +35,13 @@ import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 
 import com.alibaba.cloud.ai.dataagent.service.llm.LlmService;
+import com.alibaba.cloud.ai.dataagent.dto.planner.Plan;
 import com.alibaba.cloud.ai.dataagent.util.ChatResponseUtil;
 import com.alibaba.cloud.ai.dataagent.workflow.node.PlannerNode;
+import com.alibaba.cloud.ai.graph.GraphResponse;
 import com.alibaba.cloud.ai.graph.OverAllState;
 import com.alibaba.cloud.ai.graph.state.strategy.ReplaceStrategy;
+import com.alibaba.cloud.ai.graph.streaming.StreamingOutput;
 
 import reactor.core.publisher.Flux;
 
@@ -172,7 +176,21 @@ class PlannerNodeTest {
 		Map<String, Object> result = plannerNode.apply(state);
 		assertNotNull(result);
 		assertTrue(result.containsKey(PLANNER_NODE_OUTPUT));
-		assertNotNull(result.get(PLANNER_NODE_OUTPUT));
+
+		@SuppressWarnings("unchecked")
+		Flux<GraphResponse<StreamingOutput>> generator = (Flux<GraphResponse<StreamingOutput>>) result
+			.get(PLANNER_NODE_OUTPUT);
+		List<GraphResponse<StreamingOutput>> responses = generator.collectList().block(Duration.ofSeconds(2));
+		assertNotNull(responses);
+		String planJson = responses.stream()
+			.filter(GraphResponse::isDone)
+			.findFirst()
+			.flatMap(GraphResponse::resultValue)
+			.map(value -> (Map<?, ?>) value)
+			.map(value -> (String) value.get(PLANNER_NODE_OUTPUT))
+			.orElseThrow();
+		Plan plan = com.alibaba.cloud.ai.dataagent.util.JsonUtil.getObjectMapper().readValue(planJson, Plan.class);
+		assertEquals("查询所有用户信息", plan.getExecutionPlan().get(0).getToolParameters().getInstruction());
 	}
 
 	@Test

@@ -119,7 +119,7 @@ public class PythonExecuteNode implements NodeAction {
 			}
 			String finalStdout = stdout;
 
-			log.info("Python Execute Success! StdOut: {}", finalStdout);
+			log.debug("Python Execute Success! StdOut: {}", finalStdout);
 
 			// Create display flux for user experience only
 			Flux<ChatResponse> displayFlux = Flux.create(emitter -> {

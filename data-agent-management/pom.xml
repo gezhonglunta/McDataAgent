@@ -295,6 +295,15 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-webflux</artifactId>
         </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-security</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-test</artifactId>
+            <scope>test</scope>
+        </dependency>
 
 
         <dependency>
@@ -430,7 +439,31 @@
                         <configuration>
                             <rules>
                                 <rule>
+                                    <element>BUNDLE</element>
+                                    <limits>
+                                        <limit>
+                                            <counter>LINE</counter>
+                                            <value>COVEREDRATIO</value>
+                                            <minimum>0.75</minimum>
+                                        </limit>
+                                        <limit>
+                                            <counter>BRANCH</counter>
+                                            <value>COVEREDRATIO</value>
+                                            <minimum>0.69</minimum>
+                                        </limit>
+                                    </limits>
+                                </rule>
+                                <rule>
                                     <element>PACKAGE</element>
+                                    <includes>
+                                        <include>com.alibaba.cloud.ai.dataagent.security</include>
+                                        <include>com.alibaba.cloud.ai.dataagent.service.aimodelconfig</include>
+                                        <include>com.alibaba.cloud.ai.dataagent.service.knowledge</include>
+                                        <include>com.alibaba.cloud.ai.dataagent.connector.accessor</include>
+                                        <include>com.alibaba.cloud.ai.dataagent.connector.ddl</include>
+                                        <include>com.alibaba.cloud.ai.dataagent.connector.pool</include>
+                                        <include>com.alibaba.cloud.ai.dataagent.service.datasource.handler.registry</include>
+                                    </includes>
                                     <limits>
                                         <limit>
                                             <counter>LINE</counter>

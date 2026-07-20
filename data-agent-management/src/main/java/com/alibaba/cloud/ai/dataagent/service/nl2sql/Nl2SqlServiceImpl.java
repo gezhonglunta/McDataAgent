@@ -59,7 +59,7 @@ public class Nl2SqlServiceImpl implements Nl2SqlService {
 	@Override
 	public Flux<String> generateSql(SqlGenerationDTO sqlGenerationDTO) {
 		String sql = sqlGenerationDTO.getSql();
-		log.info("Generating SQL for query: {}, hasExistingSql: {}, dialect: {}",
+		log.debug("Generating SQL for query: {}, hasExistingSql: {}, dialect: {}",
 				sqlGenerationDTO.getExecutionDescription(), StringUtils.hasText(sql), sqlGenerationDTO.getDialect());
 
 		Flux<String> newSqlFlux;

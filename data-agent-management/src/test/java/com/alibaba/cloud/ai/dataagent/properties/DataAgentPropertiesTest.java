@@ -13,19 +13,19 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.alibaba.cloud.ai.dataagent.service.hybrid.fusion.impl;
+package com.alibaba.cloud.ai.dataagent.properties;
 
-import com.alibaba.cloud.ai.dataagent.service.hybrid.fusion.FusionStrategy;
-import org.springframework.ai.document.Document;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
-import java.util.List;
+import org.junit.jupiter.api.Test;
 
-public class WeightedAverageStrategy implements FusionStrategy {
+class DataAgentPropertiesTest {
 
-	@SuppressWarnings("unchecked")
-	@Override
-	public List<Document> fuseResults(int topK, List<Document>... resultLists) {
-		throw new UnsupportedOperationException("Not implemented");
+	@Test
+	void defaultChartTimeoutAllowsStructuredOutputRepair() {
+		DataAgentProperties properties = new DataAgentProperties();
+
+		assertEquals(15000L, properties.getEnrichSqlResultTimeout());
 	}
 
 }

@@ -15,61 +15,58 @@
  */
 package com.alibaba.cloud.ai.dataagent.connector.accessor;
 
+import com.alibaba.cloud.ai.dataagent.bo.DbConfigBO;
+import com.alibaba.cloud.ai.dataagent.enums.BizDataSourceTypeEnum;
+import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.util.List;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
-
-@ExtendWith(MockitoExtension.class)
 class AccessorFactoryTest {
+
+	private Accessor mysqlAccessor;
 
 	private AccessorFactory factory;
 
 	@BeforeEach
 	void setUp() {
-		Accessor accessor1 = mock(Accessor.class);
-		when(accessor1.getAccessorType()).thenReturn("mysql_jdbc");
-
-		Accessor accessor2 = mock(Accessor.class);
-		when(accessor2.getAccessorType()).thenReturn("postgresql_jdbc");
-
-		factory = new AccessorFactory(List.of(accessor1, accessor2));
+		mysqlAccessor = mock(Accessor.class);
+		for (BizDataSourceTypeEnum type : BizDataSourceTypeEnum.values()) {
+			when(mysqlAccessor.supportedDataSourceType(type)).thenReturn(type == BizDataSourceTypeEnum.MYSQL);
+		}
+		factory = new AccessorFactory(List.of(mysqlAccessor));
 	}
 
 	@Test
-	void testIsRegistered_true() {
-		assertTrue(factory.isRegistered("mysql_jdbc"));
+	void getAccessorByDbType_usesPrebuiltTypeIndex() {
+		assertEquals(mysqlAccessor, factory.getAccessorByDbTypeEnum(BizDataSourceTypeEnum.MYSQL));
 	}
 
 	@Test
-	void testIsRegistered_false() {
-		assertFalse(factory.isRegistered("unknown"));
+	void getAccessorByDbConfig_resolvesDialectAndProtocol() {
+		DbConfigBO config = new DbConfigBO();
+		config.setDialectType(BizDataSourceTypeEnum.MYSQL.getDialect());
+		config.setConnectionType(BizDataSourceTypeEnum.MYSQL.getProtocol());
+
+		assertEquals(mysqlAccessor, factory.getAccessorByDbConfig(config));
 	}
 
 	@Test
-	void testGetAccessorByType() {
-		assertNotNull(factory.getAccessorByType("mysql_jdbc"));
-		assertNotNull(factory.getAccessorByType("postgresql_jdbc"));
-		assertNull(factory.getAccessorByType("nonexistent"));
+	void missingAccessor_failsClearly() {
+		assertThrows(IllegalStateException.class,
+				() -> factory.getAccessorByDbTypeEnum(BizDataSourceTypeEnum.POSTGRESQL));
 	}
 
 	@Test
-	void testGetAccessorByDbConfig_nullThrows() {
-		assertThrows(IllegalArgumentException.class, () -> factory.getAccessorByDbConfig(null));
-	}
+	void duplicateAccessor_failsAtStartup() {
+		Accessor duplicate = mock(Accessor.class);
+		when(duplicate.supportedDataSourceType(BizDataSourceTypeEnum.MYSQL)).thenReturn(true);
 
-	@Test
-	void testRegister() {
-		Accessor newAccessor = mock(Accessor.class);
-		when(newAccessor.getAccessorType()).thenReturn("oracle_jdbc");
-
-		factory.register(newAccessor);
-		assertTrue(factory.isRegistered("oracle_jdbc"));
+		assertThrows(IllegalStateException.class, () -> new AccessorFactory(List.of(mysqlAccessor, duplicate)));
 	}
 
 }

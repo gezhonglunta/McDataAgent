@@ -37,7 +37,10 @@ public abstract class AbstractDBConnectionPool implements DBConnectionPool {
 	/**
 	 * DataSource cache to ensure that each configuration creates DataSource only once.
 	 */
-	private static final ConcurrentHashMap<String, DataSource> DATA_SOURCE_CACHE = new ConcurrentHashMap<>();
+	private static final ConcurrentHashMap<DataSourceCacheKey, DataSource> DATA_SOURCE_CACHE = new ConcurrentHashMap<>();
+
+	private record DataSourceCacheKey(String url, String username, String password, String driver) {
+	}
 
 	private final ConnectionRetryPolicy retryPolicy;
 
@@ -102,18 +105,19 @@ public abstract class AbstractDBConnectionPool implements DBConnectionPool {
 		for (int attempt = 1; attempt <= maxAttempts; attempt++) {
 			try {
 				// Generate cache key based on connection parameters
-				String cacheKey = generateCacheKey(jdbcUrl, config.getUsername(), config.getPassword());
+				DataSourceCacheKey cacheKey = generateCacheKey(jdbcUrl, config.getUsername(), config.getPassword());
 
 				// Use computeIfAbsent to ensure thread safety and avoid duplicate
 				// DataSource
 				// creation
 				DataSource dataSource = DATA_SOURCE_CACHE.computeIfAbsent(cacheKey, key -> {
 					try {
-						log.debug("Creating new DataSource for key: {}", key);
+						log.debug("Creating new DataSource for URL: {}, username: {}", jdbcUrl, config.getUsername());
 						return createdDataSource(jdbcUrl, config.getUsername(), config.getPassword());
 					}
 					catch (Exception e) {
-						log.error("Failed to create DataSource for key: {}", key, e);
+						log.error("Failed to create DataSource for URL: {}, username: {}", jdbcUrl,
+								config.getUsername(), e);
 						throw new RuntimeException("Failed to create DataSource", e);
 					}
 				});
@@ -158,8 +162,8 @@ public abstract class AbstractDBConnectionPool implements DBConnectionPool {
 	 * @param password the database password
 	 * @return the cache key
 	 */
-	private String generateCacheKey(String url, String username, String password) {
-		return url + "|" + username + "|" + Objects.hashCode(password);
+	private DataSourceCacheKey generateCacheKey(String url, String username, String password) {
+		return new DataSourceCacheKey(url, username, password, getDriver());
 	}
 
 	@Override

@@ -40,13 +40,6 @@ public interface LlmService {
 	 */
 	Flux<ChatResponse> callUser(String user, Class<?> outputType);
 
-	@Deprecated
-	default String blockToString(Flux<ChatResponse> responseFlux) {
-		return toStringFlux(responseFlux).collect(StringBuilder::new, StringBuilder::append)
-			.map(StringBuilder::toString)
-			.block();
-	}
-
 	default Flux<String> toStringFlux(Flux<ChatResponse> responseFlux) {
 		return responseFlux.map(ChatResponseUtil::getText);
 	}

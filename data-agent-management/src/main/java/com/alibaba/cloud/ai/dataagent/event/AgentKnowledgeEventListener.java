@@ -99,14 +99,8 @@ public class AgentKnowledgeEventListener {
 		}
 
 		try {
-			// 2. 删除向量
-			boolean vectorDeleted = agentKnowledgeResourceManager.deleteFromVectorStore(knowledge.getAgentId(), id);
-
-			// 3. 删除文件
-			boolean fileDeleted = agentKnowledgeResourceManager.deleteKnowledgeFile(knowledge);
-
-			// 4. 更新清理状态
-			if (vectorDeleted && fileDeleted) {
+			// 2. 清理向量和文件
+			if (agentKnowledgeResourceManager.cleanupResources(knowledge)) {
 				// 只有都成功了，才标记为资源已清理
 				knowledge.setIsResourceCleaned(1);
 				knowledge.setUpdatedTime(LocalDateTime.now());
@@ -114,8 +108,7 @@ public class AgentKnowledgeEventListener {
 				log.info("Resources cleaned up successfully. AgentKnowledgeID: {}", id);
 			}
 			else {
-				log.error("Cleanup incomplete. AgentKnowledgeID: {}, VectorDeleted: {}, FileDeleted: {}", id,
-						vectorDeleted, fileDeleted);
+				log.error("Cleanup incomplete. AgentKnowledgeID: {}", id);
 				// isResourceCleaned=0，有定时任务兜底清理。
 			}
 

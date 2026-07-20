@@ -21,13 +21,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.model.ChatModel;
-import org.springframework.ai.document.Document;
 import org.springframework.ai.embedding.EmbeddingModel;
-import org.springframework.ai.embedding.EmbeddingRequest;
-import org.springframework.ai.embedding.EmbeddingResponse;
 import org.springframework.stereotype.Component;
-
-import java.util.List;
 
 @Slf4j
 @Component
@@ -60,12 +55,11 @@ public class AiModelRegistry {
 						}
 					}
 					catch (Exception e) {
-						log.error("Failed to initialize ChatClient: {}", e.getMessage(), e);
+						throw new IllegalStateException("Failed to initialize the active CHAT model", e);
 					}
 
-					// 兜底：如果还没初始化成功，抛出运行时异常，提示用户配置
 					if (currentChatClient == null) {
-						throw new RuntimeException(
+						throw new IllegalStateException(
 								"No active CHAT model configured. Please configure it in the dashboard.");
 					}
 				}
@@ -75,7 +69,7 @@ public class AiModelRegistry {
 	}
 
 	// =========================================================
-	// 2. 获取 EmbeddingModel (懒加载 + Dummy 兜底)
+	// 2. 获取 EmbeddingModel (懒加载 + 缓存)
 	// =========================================================
 	public EmbeddingModel getEmbeddingModel() {
 		if (currentEmbeddingModel == null) {
@@ -89,14 +83,12 @@ public class AiModelRegistry {
 						}
 					}
 					catch (Exception e) {
-						log.error("Failed to initialize EmbeddingModel: {}", e.getMessage());
+						throw new IllegalStateException("Failed to initialize the active EMBEDDING model", e);
 					}
 
-					// 兜底：为了防止 VectorStore Starter 启动时调用 dimensions() 报错
-					// 我们必须返回一个"哑巴"模型，而不是 null 或 抛异常
 					if (currentEmbeddingModel == null) {
-						log.warn("Using DummyEmbeddingModel for fallback.");
-						currentEmbeddingModel = new DummyEmbeddingModel();
+						throw new IllegalStateException(
+								"No active EMBEDDING model configured. Please configure it in the dashboard.");
 					}
 				}
 			}
@@ -116,48 +108,6 @@ public class AiModelRegistry {
 	public void refreshEmbedding() {
 		this.currentEmbeddingModel = null;
 		log.info("Embedding cache cleared.");
-	}
-
-	// =========================================================
-	// 4. 内部类：哑巴嵌入模型 (仅用于启动时防崩)
-	// =========================================================
-	private static class DummyEmbeddingModel implements EmbeddingModel {
-
-		@Override
-		public EmbeddingResponse call(EmbeddingRequest request) {
-			throw noActiveEmbeddingModel();
-		}
-
-		@Override
-		public float[] embed(Document document) {
-			throw noActiveEmbeddingModel();
-		}
-
-		@Override
-		public float[] embed(String text) {
-			throw noActiveEmbeddingModel();
-		}
-
-		@Override
-		public List<float[]> embed(List<String> texts) {
-			throw noActiveEmbeddingModel();
-		}
-
-		@Override
-		public EmbeddingResponse embedForResponse(List<String> texts) {
-			throw noActiveEmbeddingModel();
-		}
-
-		// 关键：返回一个常用维度 (1536是OpenAI的维度)，骗过向量库的初始化检查
-		@Override
-		public int dimensions() {
-			return 1536;
-		}
-
-		private RuntimeException noActiveEmbeddingModel() {
-			return new IllegalStateException("No active EMBEDDING model. Please configure it first!");
-		}
-
 	}
 
 }

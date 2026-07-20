@@ -20,6 +20,9 @@ import com.alibaba.cloud.ai.dataagent.exception.InvalidInputException;
 import com.alibaba.cloud.ai.dataagent.vo.ApiResponse;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.server.ResponseStatusException;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -72,6 +75,18 @@ class GlobalExceptionHandlerTest {
 
 		assertFalse(response.isSuccess());
 		assertEquals("\u670d\u52a1\u5668\u5185\u90e8\u9519\u8bef", response.getMessage());
+	}
+
+	@Test
+	void handleResponseStatusException_preservesStatusAndReason() {
+		ResponseStatusException ex = new ResponseStatusException(HttpStatus.NOT_FOUND, "agent not found");
+
+		ResponseEntity<ApiResponse<Object>> response = handler.handleResponseStatusException(ex);
+
+		assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
+		assertNotNull(response.getBody());
+		assertFalse(response.getBody().isSuccess());
+		assertEquals("agent not found", response.getBody().getMessage());
 	}
 
 }

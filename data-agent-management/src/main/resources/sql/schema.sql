@@ -90,7 +90,8 @@ CREATE TABLE IF NOT EXISTS `agent_knowledge` (
   PRIMARY KEY (`id`) USING BTREE,
   KEY `idx_agent_id_status` (`agent_id`,`is_recall`) USING BTREE,
   KEY `idx_embedding_status` (`embedding_status`) USING BTREE,
-  KEY `idx_is_deleted` (`is_deleted`) USING BTREE
+  KEY `idx_is_deleted` (`is_deleted`) USING BTREE,
+  CONSTRAINT `fk_agent_knowledge_agent` FOREIGN KEY (`agent_id`) REFERENCES `agent` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB AUTO_INCREMENT=18 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC COMMENT='智能体知识源管理表 (支持文档、QA、FAQ)';
 
 -- 数据源表

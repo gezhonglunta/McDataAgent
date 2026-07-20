@@ -21,6 +21,7 @@ import com.alibaba.cloud.ai.dataagent.enums.ModelType;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.ai.chat.model.ChatModel;
@@ -95,8 +96,9 @@ class ModelConfigOpsServiceTest {
 
 		service.activateConfig(1);
 
-		verify(aiModelRegistry).refreshChat();
-		verify(modelConfigDataService).switchActiveStatus(1, ModelType.CHAT);
+		InOrder activationOrder = inOrder(modelConfigDataService, aiModelRegistry);
+		activationOrder.verify(modelConfigDataService).switchActiveStatus(1, ModelType.CHAT);
+		activationOrder.verify(aiModelRegistry).refreshChat();
 	}
 
 	@Test

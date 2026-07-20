@@ -20,9 +20,11 @@ import com.alibaba.cloud.ai.dataagent.exception.InvalidInputException;
 import com.alibaba.cloud.ai.dataagent.vo.ApiResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.server.ResponseStatusException;
 
 /**
  * 全局异常处理器 (WebFlux 版本)
@@ -43,6 +45,18 @@ public class GlobalExceptionHandler {
 	public ApiResponse<Object> handleInternalServerException(InternalServerException e) {
 		log.error("Internal server error: {}", e.getMessage(), e);
 		return ApiResponse.error(e.getMessage());
+	}
+
+	@ExceptionHandler(ResponseStatusException.class)
+	public ResponseEntity<ApiResponse<Object>> handleResponseStatusException(ResponseStatusException e) {
+		String message = e.getReason() == null ? e.getStatusCode().toString() : e.getReason();
+		if (e.getStatusCode().is5xxServerError()) {
+			log.error("Request failed with status {}: {}", e.getStatusCode(), message, e);
+		}
+		else {
+			log.warn("Request failed with status {}: {}", e.getStatusCode(), message);
+		}
+		return ResponseEntity.status(e.getStatusCode()).body(ApiResponse.error(message));
 	}
 
 	@ExceptionHandler(Exception.class)

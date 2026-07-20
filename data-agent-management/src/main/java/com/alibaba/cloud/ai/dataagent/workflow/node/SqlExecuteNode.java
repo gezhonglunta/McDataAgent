@@ -96,7 +96,7 @@ public class SqlExecuteNode implements NodeAction {
 		String sqlQuery = StateUtil.getStringValue(state, SQL_GENERATE_OUTPUT);
 		sqlQuery = nl2SqlService.sqlTrim(sqlQuery);
 
-		log.info("Executing SQL query: {}", sqlQuery);
+		log.debug("Executing SQL query: {}", sqlQuery);
 
 		// Get the agent ID from the state
 		String agentIdStr = StateUtil.getStringValue(state, Constant.AGENT_ID);

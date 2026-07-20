@@ -51,7 +51,7 @@ public class QueryEnhanceNode implements NodeAction {
 
 		// 获取用户输入
 		String userInput = StateUtil.getStringValue(state, INPUT_KEY);
-		log.info("User input for query enhance: {}", userInput);
+		log.debug("User input for query enhance: {}", userInput);
 
 		String evidence = StateUtil.getStringValue(state, EVIDENCE);
 		String multiTurn = StateUtil.getStringValue(state, MULTI_TURN_CONTEXT, "(无)");
@@ -77,16 +77,16 @@ public class QueryEnhanceNode implements NodeAction {
 	private Map<String, Object> handleQueryEnhance(String llmOutput) {
 		// 获取处理结果
 		String enhanceResult = MarkdownParserUtil.extractRawText(llmOutput.trim());
-		log.info("Query enhance result: {}", enhanceResult);
+		log.debug("Query enhance result: {}", enhanceResult);
 
 		// 解析处理结果，转成 QueryProcessOutputDTO
 		QueryEnhanceOutputDTO queryEnhanceOutputDTO = null;
 		try {
 			queryEnhanceOutputDTO = jsonParseUtil.tryConvertToObject(enhanceResult, QueryEnhanceOutputDTO.class);
-			log.info("Successfully parsed query enhance result: {}", queryEnhanceOutputDTO);
+			log.debug("Successfully parsed query enhance result: {}", queryEnhanceOutputDTO);
 		}
 		catch (Exception e) {
-			log.error("Failed to parse query enhance result: {}", enhanceResult, e);
+			log.error("Failed to parse query enhance result", e);
 		}
 
 		if (queryEnhanceOutputDTO == null)

@@ -122,7 +122,9 @@ public class AgentKnowledgeResourceManager {
 			metadata.put(Constant.AGENT_ID, agentId.toString());
 			metadata.put(DocumentMetadataConstant.DB_AGENT_KNOWLEDGE_ID, knowledgeId);
 
-			agentVectorStoreService.deleteDocumentsByMetedata(agentId.toString(), metadata);
+			if (!Boolean.TRUE.equals(agentVectorStoreService.deleteDocumentsByMetadata(agentId.toString(), metadata))) {
+				return false;
+			}
 			log.info("Successfully deleted knowledge from vector store, knowledgeId: {}", knowledgeId);
 			return true;
 
@@ -180,6 +182,17 @@ public class AgentKnowledgeResourceManager {
 				return false;
 			}
 		}
+	}
+
+	/**
+	 * Idempotently clean every external resource owned by one knowledge record.
+	 * @param knowledge knowledge record, including logically deleted records
+	 * @return {@code true} only when both vector and file resources are clean
+	 */
+	public boolean cleanupResources(AgentKnowledge knowledge) {
+		boolean vectorDeleted = deleteFromVectorStore(knowledge.getAgentId(), knowledge.getId());
+		boolean fileDeleted = deleteKnowledgeFile(knowledge);
+		return vectorDeleted && fileDeleted;
 	}
 
 }

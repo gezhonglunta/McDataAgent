@@ -77,14 +77,14 @@ public class SemanticConsistencyNode implements NodeAction {
 			.userQuery(userQuery)
 			.evidence(evidence)
 			.build();
-		log.info("Starting semantic consistency validation - SQL: {}", sql);
+		log.debug("Starting semantic consistency validation - SQL: {}", sql);
 		Flux<ChatResponse> validationResultFlux = nl2SqlService.performSemanticConsistency(semanticConsistencyDTO);
 
 		Flux<GraphResponse<StreamingOutput>> generator = FluxUtil.createStreamingGeneratorWithMessages(this.getClass(),
 				state, "开始语义一致性校验", "语义一致性校验完成", validationResult -> {
 					SemanticConsistencyOutputDTO output = OUTPUT_CONVERTER.convert(validationResult);
 					Map<String, Object> result = buildValidationResult(output.isPassed(), output.getReason());
-					log.info("[{}] Semantic consistency validation result: {}, passed: {}",
+					log.debug("[{}] Semantic consistency validation result: {}, passed: {}",
 							this.getClass().getSimpleName(), output.getReason(), output.isPassed());
 					return result;
 				}, validationResultFlux);

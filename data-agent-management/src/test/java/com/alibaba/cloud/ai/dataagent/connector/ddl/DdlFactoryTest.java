@@ -15,60 +15,46 @@
  */
 package com.alibaba.cloud.ai.dataagent.connector.ddl;
 
+import com.alibaba.cloud.ai.dataagent.bo.DbConfigBO;
 import com.alibaba.cloud.ai.dataagent.enums.BizDataSourceTypeEnum;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.junit.jupiter.MockitoExtension;
-
 import java.util.List;
+import org.junit.jupiter.api.Test;
 
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
-@ExtendWith(MockitoExtension.class)
 class DdlFactoryTest {
 
-	private DdlFactory factory;
+	@Test
+	void resolvesDdlFromDatasourceTypeAndConfig() {
+		Ddl mysql = mock(Ddl.class);
+		when(mysql.getDataSourceType()).thenReturn(BizDataSourceTypeEnum.MYSQL);
+		DdlFactory factory = new DdlFactory(List.of(mysql));
+		DbConfigBO config = new DbConfigBO();
+		config.setDialectType("mysql");
 
-	private Ddl mysqlDdl;
-
-	@BeforeEach
-	void setUp() {
-		mysqlDdl = mock(Ddl.class);
-		when(mysqlDdl.getDdlType()).thenReturn("mysql_jdbc");
-
-		factory = new DdlFactory(List.of(mysqlDdl));
+		assertEquals(mysql, factory.getDdlExecutorByDbType(BizDataSourceTypeEnum.MYSQL));
+		assertEquals(mysql, factory.getDdlExecutorByDbConfig(config));
 	}
 
 	@Test
-	void testIsRegistered_true() {
-		assertTrue(factory.isRegistered("mysql_jdbc"));
+	void missingDdl_failsClearly() {
+		DdlFactory factory = new DdlFactory(List.of());
+
+		assertThrows(IllegalStateException.class,
+				() -> factory.getDdlExecutorByDbType(BizDataSourceTypeEnum.POSTGRESQL));
 	}
 
 	@Test
-	void testIsRegistered_false() {
-		assertFalse(factory.isRegistered("unknown"));
-	}
+	void duplicateDdl_failsAtStartup() {
+		Ddl first = mock(Ddl.class);
+		Ddl duplicate = mock(Ddl.class);
+		when(first.getDataSourceType()).thenReturn(BizDataSourceTypeEnum.MYSQL);
+		when(duplicate.getDataSourceType()).thenReturn(BizDataSourceTypeEnum.MYSQL);
 
-	@Test
-	void testGetDdlExecutorByType() {
-		assertNotNull(factory.getDdlExecutorByType("mysql_jdbc"));
-		assertNull(factory.getDdlExecutorByType("nonexistent"));
-	}
-
-	@Test
-	void testRegistry() {
-		Ddl newDdl = mock(Ddl.class);
-		when(newDdl.getDdlType()).thenReturn("oracle_jdbc");
-
-		factory.registry(newDdl);
-		assertTrue(factory.isRegistered("oracle_jdbc"));
-	}
-
-	@Test
-	void testGetDdlExecutorByDbType_notFound() {
-		assertThrows(IllegalStateException.class, () -> factory.getDdlExecutorByDbType(BizDataSourceTypeEnum.MYSQL));
+		assertThrows(IllegalStateException.class, () -> new DdlFactory(List.of(first, duplicate)));
 	}
 
 }

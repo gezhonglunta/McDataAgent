@@ -110,8 +110,7 @@ class AgentKnowledgeEventListenerTest {
 		AgentKnowledgeDeletionEvent event = new AgentKnowledgeDeletionEvent(this, 1);
 
 		when(agentKnowledgeMapper.selectByIdIncludeDeleted(1)).thenReturn(knowledge);
-		when(agentKnowledgeResourceManager.deleteFromVectorStore(10, 1)).thenReturn(true);
-		when(agentKnowledgeResourceManager.deleteKnowledgeFile(knowledge)).thenReturn(true);
+		when(agentKnowledgeResourceManager.cleanupResources(knowledge)).thenReturn(true);
 
 		listener.handleDeletionEvent(event);
 
@@ -127,8 +126,7 @@ class AgentKnowledgeEventListenerTest {
 		AgentKnowledgeDeletionEvent event = new AgentKnowledgeDeletionEvent(this, 1);
 
 		when(agentKnowledgeMapper.selectByIdIncludeDeleted(1)).thenReturn(knowledge);
-		when(agentKnowledgeResourceManager.deleteFromVectorStore(10, 1)).thenReturn(true);
-		when(agentKnowledgeResourceManager.deleteKnowledgeFile(knowledge)).thenReturn(false);
+		when(agentKnowledgeResourceManager.cleanupResources(knowledge)).thenReturn(false);
 
 		listener.handleDeletionEvent(event);
 
@@ -143,7 +141,7 @@ class AgentKnowledgeEventListenerTest {
 		AgentKnowledgeDeletionEvent event = new AgentKnowledgeDeletionEvent(this, 1);
 
 		when(agentKnowledgeMapper.selectByIdIncludeDeleted(1)).thenReturn(knowledge);
-		when(agentKnowledgeResourceManager.deleteFromVectorStore(10, 1))
+		when(agentKnowledgeResourceManager.cleanupResources(knowledge))
 			.thenThrow(new RuntimeException("cleanup error"));
 
 		listener.handleDeletionEvent(event);

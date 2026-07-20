@@ -71,21 +71,14 @@ public class AgentKnowledgeResourceCleanerTask {
 	private void cleanupSingleRecord(AgentKnowledge knowledge) {
 		Integer id = knowledge.getId();
 
-		// A. 删除向量 (复用 ResourceManager 的逻辑)
-		boolean vectorDeleted = resourceManager.deleteFromVectorStore(knowledge.getAgentId(), id);
-
-		// B. 删除文件
-		boolean fileDeleted = resourceManager.deleteKnowledgeFile(knowledge);
-
-		// C. 如果都清理干净了，更新数据库状态
-		if (vectorDeleted && fileDeleted) {
+		if (resourceManager.cleanupResources(knowledge)) {
 			knowledge.setIsResourceCleaned(1);
 			knowledge.setUpdatedTime(LocalDateTime.now());
 			mapper.update(knowledge);
 			log.info("Zombie resource cleaned: ID={}", id);
 		}
 		else {
-			log.warn("Partial cleanup for ID={}. VectorDel={}, FileDel={}", id, vectorDeleted, fileDeleted);
+			log.warn("Partial cleanup for ID={}", id);
 		}
 	}
 

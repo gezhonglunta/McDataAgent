@@ -18,7 +18,9 @@ package com.alibaba.cloud.ai.dataagent.converter;
 import com.alibaba.cloud.ai.dataagent.dto.ModelConfigDTO;
 import com.alibaba.cloud.ai.dataagent.entity.ModelConfig;
 import com.alibaba.cloud.ai.dataagent.enums.ModelType;
+import com.alibaba.cloud.ai.dataagent.util.ApiKeyUtil;
 import org.springframework.util.Assert;
+import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
 
@@ -49,6 +51,19 @@ public class ModelConfigConverter {
 			.proxyUsername(entity.getProxyUsername())
 			.proxyPassword(entity.getProxyPassword())
 			.build();
+	}
+
+	/**
+	 * Entity -> DTO 用于外部展示，敏感凭证只返回掩码。
+	 */
+	public static ModelConfigDTO toMaskedDTO(ModelConfig entity) {
+		ModelConfigDTO dto = toDTO(entity);
+		if (dto == null) {
+			return null;
+		}
+		dto.setApiKey(ApiKeyUtil.mask(entity.getApiKey()));
+		dto.setProxyPassword(StringUtils.hasText(entity.getProxyPassword()) ? "****" : null);
+		return dto;
 	}
 
 	/**

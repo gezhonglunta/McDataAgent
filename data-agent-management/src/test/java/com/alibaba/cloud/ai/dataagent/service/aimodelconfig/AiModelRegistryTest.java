@@ -55,10 +55,11 @@ class AiModelRegistryTest {
 	}
 
 	@Test
-	void getChatClient_noActiveConfig_throwsRuntimeException() {
+	void getChatClient_noActiveConfig_throwsClearException() {
 		when(modelConfigDataService.getActiveConfigByType(ModelType.CHAT)).thenReturn(null);
 
-		assertThrows(RuntimeException.class, () -> registry.getChatClient());
+		IllegalStateException error = assertThrows(IllegalStateException.class, () -> registry.getChatClient());
+		assertTrue(error.getMessage().contains("No active CHAT model"));
 	}
 
 	@Test
@@ -94,7 +95,7 @@ class AiModelRegistryTest {
 	}
 
 	@Test
-	void getChatClient_factoryThrows_throwsRuntimeException() {
+	void getChatClient_factoryThrows_preservesCause() {
 		ModelConfigDTO config = ModelConfigDTO.builder()
 			.provider("openai")
 			.apiKey("sk-test")
@@ -104,17 +105,16 @@ class AiModelRegistryTest {
 		when(modelConfigDataService.getActiveConfigByType(ModelType.CHAT)).thenReturn(config);
 		when(modelFactory.createChatModel(config)).thenThrow(new RuntimeException("factory error"));
 
-		assertThrows(RuntimeException.class, () -> registry.getChatClient());
+		IllegalStateException error = assertThrows(IllegalStateException.class, () -> registry.getChatClient());
+		assertEquals("factory error", error.getCause().getMessage());
 	}
 
 	@Test
-	void getEmbeddingModel_noActiveConfig_returnsDummyModel() {
+	void getEmbeddingModel_noActiveConfig_throwsClearException() {
 		when(modelConfigDataService.getActiveConfigByType(ModelType.EMBEDDING)).thenReturn(null);
 
-		EmbeddingModel result = registry.getEmbeddingModel();
-
-		assertNotNull(result);
-		assertEquals(1536, result.dimensions());
+		IllegalStateException error = assertThrows(IllegalStateException.class, () -> registry.getEmbeddingModel());
+		assertTrue(error.getMessage().contains("No active EMBEDDING model"));
 	}
 
 	@Test
@@ -134,7 +134,7 @@ class AiModelRegistryTest {
 	}
 
 	@Test
-	void getEmbeddingModel_factoryThrows_returnsDummyModel() {
+	void getEmbeddingModel_factoryThrows_preservesCause() {
 		ModelConfigDTO config = ModelConfigDTO.builder()
 			.provider("openai")
 			.apiKey("sk-test")
@@ -144,15 +144,15 @@ class AiModelRegistryTest {
 		when(modelConfigDataService.getActiveConfigByType(ModelType.EMBEDDING)).thenReturn(config);
 		when(modelFactory.createEmbeddingModel(config)).thenThrow(new RuntimeException("factory error"));
 
-		EmbeddingModel result = registry.getEmbeddingModel();
-
-		assertNotNull(result);
-		assertEquals(1536, result.dimensions());
+		IllegalStateException error = assertThrows(IllegalStateException.class, () -> registry.getEmbeddingModel());
+		assertEquals("factory error", error.getCause().getMessage());
 	}
 
 	@Test
 	void getEmbeddingModel_cachesResult() {
-		when(modelConfigDataService.getActiveConfigByType(ModelType.EMBEDDING)).thenReturn(null);
+		ModelConfigDTO config = ModelConfigDTO.builder().modelName("embedding").build();
+		when(modelConfigDataService.getActiveConfigByType(ModelType.EMBEDDING)).thenReturn(config);
+		when(modelFactory.createEmbeddingModel(config)).thenReturn(embeddingModel);
 
 		EmbeddingModel first = registry.getEmbeddingModel();
 		EmbeddingModel second = registry.getEmbeddingModel();
@@ -180,50 +180,15 @@ class AiModelRegistryTest {
 
 	@Test
 	void refreshEmbedding_clearsCache() {
-		when(modelConfigDataService.getActiveConfigByType(ModelType.EMBEDDING)).thenReturn(null);
+		ModelConfigDTO config = ModelConfigDTO.builder().modelName("embedding").build();
+		when(modelConfigDataService.getActiveConfigByType(ModelType.EMBEDDING)).thenReturn(config);
+		when(modelFactory.createEmbeddingModel(config)).thenReturn(embeddingModel);
 
 		registry.getEmbeddingModel();
 		registry.refreshEmbedding();
 
 		registry.getEmbeddingModel();
 		verify(modelConfigDataService, times(2)).getActiveConfigByType(ModelType.EMBEDDING);
-	}
-
-	@Test
-	void dummyEmbeddingModel_callThrowsException() {
-		when(modelConfigDataService.getActiveConfigByType(ModelType.EMBEDDING)).thenReturn(null);
-
-		EmbeddingModel dummy = registry.getEmbeddingModel();
-
-		assertThrows(RuntimeException.class, () -> dummy.call(null));
-	}
-
-	@Test
-	void dummyEmbeddingModel_embedTextThrowsClearException() {
-		when(modelConfigDataService.getActiveConfigByType(ModelType.EMBEDDING)).thenReturn(null);
-
-		EmbeddingModel dummy = registry.getEmbeddingModel();
-
-		IllegalStateException error = assertThrows(IllegalStateException.class, () -> dummy.embed("text"));
-		assertTrue(error.getMessage().contains("No active EMBEDDING model"));
-	}
-
-	@Test
-	void dummyEmbeddingModel_embedListThrowsClearException() {
-		when(modelConfigDataService.getActiveConfigByType(ModelType.EMBEDDING)).thenReturn(null);
-
-		EmbeddingModel dummy = registry.getEmbeddingModel();
-
-		assertThrows(IllegalStateException.class, () -> dummy.embed(java.util.List.of("text")));
-	}
-
-	@Test
-	void dummyEmbeddingModel_embedForResponseThrowsClearException() {
-		when(modelConfigDataService.getActiveConfigByType(ModelType.EMBEDDING)).thenReturn(null);
-
-		EmbeddingModel dummy = registry.getEmbeddingModel();
-
-		assertThrows(IllegalStateException.class, () -> dummy.embedForResponse(java.util.List.of("text")));
 	}
 
 }

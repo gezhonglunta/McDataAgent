@@ -118,7 +118,7 @@ public class TableRelationNode implements NodeAction {
 
 		Flux<ChatResponse> schemaFlux = processSchemaSelection(initialSchema, canonicalQuery, evidence, state,
 				agentDbConfig, result -> {
-					log.info("[{}] Schema processing result: {}", this.getClass().getSimpleName(), result);
+					log.debug("[{}] Schema processing result: {}", this.getClass().getSimpleName(), result);
 					resultMap.put(TABLE_RELATION_OUTPUT, result);
 
 					// 从最终的SchemaDTO中获取表名列表
@@ -192,7 +192,7 @@ public class TableRelationNode implements NodeAction {
 
 		Flux<ChatResponse> schemaFlux;
 		if (schemaAdvice != null) {
-			log.info("[{}] Processing with schema supplement advice: {}", this.getClass().getSimpleName(),
+			log.debug("[{}] Processing with schema supplement advice: {}", this.getClass().getSimpleName(),
 					schemaAdvice);
 			schemaFlux = nl2SqlService.fineSelect(schemaDTO, input, evidence, schemaAdvice, agentDbConfig, dtoConsumer);
 		}
