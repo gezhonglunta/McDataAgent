@@ -13,9 +13,9 @@ spring:
     # Python workflow timelines can contain generated code, result data and the final report.
     max-in-memory-size: 10MB
   datasource:
-    url: ${DATA_AGENT_DATASOURCE_URL:jdbc:mysql://127.0.0.1:3306/saa_data_agent?useUnicode=true&characterEncoding=utf-8&zeroDateTimeBehavior=convertToNull&transformedBitIsBoolean=true&allowMultiQueries=true&allowPublicKeyRetrieval=true&useSSL=false&serverTimezone=Asia/Shanghai}
-    username: ${DATA_AGENT_DATASOURCE_USERNAME:root}
-    password: ${DATA_AGENT_DATASOURCE_PASSWORD:root}
+    url: ${DATA_AGENT_DATASOURCE_URL:jdbc:mysql://190.160.13.13:20032/saa_data_agent_beta?useUnicode=true&characterEncoding=utf-8&zeroDateTimeBehavior=convertToNull&transformedBitIsBoolean=true&allowMultiQueries=true&allowPublicKeyRetrieval=true&useSSL=false&serverTimezone=Asia/Shanghai}
+    username: ${DATA_AGENT_DATASOURCE_USERNAME:dataAgent}
+    password: ${DATA_AGENT_DATASOURCE_PASSWORD:a123456.}
     driver-class-name: com.mysql.cj.jdbc.Driver
   sql:
     init:
@@ -39,7 +39,9 @@ spring:
           table-topk-limit: 10
           table-similarity-threshold: 0.2
           default-topk-limit: 8
+          batch-del-topk-limit: 10000
           default-similarity-threshold: 0.4
+          enable-hybrid-search: true
         code-executor:
           python-max-tries-count: 5
           code-timeout: 60s
@@ -80,15 +82,7 @@ spring:
       enabled: true
 
 mybatis:
-
   configuration:
     map-underscore-to-camel-case: true
     log-impl: org.apache.ibatis.logging.slf4j.Slf4jImpl
 
-# 日志配置
-logging:
-  level:
-    com.alibaba.cloud.ai.dataagent.service: info
-    com.alibaba.cloud.ai.dataagent.workflow.node: info
-    com.alibaba.cloud.ai.mapper: info
-    org.springframework.jdbc: info
