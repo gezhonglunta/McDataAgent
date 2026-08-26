@@ -63,4 +63,4 @@ export interface PromptConfigResponse {
 
 
 ---
-> 🤖 AI 提示: 逻辑实现请参考 `prompt/index.ts`。
+> 🤖 AI 提示: 逻辑实现请参考 `prompt\index.ts`。

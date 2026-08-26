@@ -165,4 +165,4 @@ export interface UseCrudPageReturn<T, TCreate = T, TUpdate = T> {
 
 
 ---
-> 🤖 AI 提示: 逻辑实现请参考 `useCrudPage/index.ts`。
+> 🤖 AI 提示: 逻辑实现请参考 `useCrudPage\index.ts`。

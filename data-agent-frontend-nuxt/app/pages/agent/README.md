@@ -4,7 +4,7 @@
 
 ## 文件
 
-- [id].vue
 - index.vue
 - new.vue
+- [id].vue
 

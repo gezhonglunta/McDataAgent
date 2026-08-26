@@ -125,4 +125,4 @@ export interface BatchImportResult {
 
 
 ---
-> 🤖 AI 提示: 逻辑实现请参考 `semanticModel/index.ts`。
+> 🤖 AI 提示: 逻辑实现请参考 `semanticModel\index.ts`。

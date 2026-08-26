@@ -9,4 +9,4 @@
 
 
 ---
-> 🤖 AI 提示: 逻辑实现请参考 `tips/index.ts`。
+> 🤖 AI 提示: 逻辑实现请参考 `tips\index.ts`。

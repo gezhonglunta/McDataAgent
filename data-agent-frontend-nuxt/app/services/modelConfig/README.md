@@ -60,4 +60,4 @@ export interface ModelCheckReady {
 
 
 ---
-> 🤖 AI 提示: 逻辑实现请参考 `modelConfig/index.ts`。
+> 🤖 AI 提示: 逻辑实现请参考 `modelConfig\index.ts`。
