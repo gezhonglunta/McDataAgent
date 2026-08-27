@@ -13,34 +13,32 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.alibaba.cloud.ai.dataagent.dto.prompt;
+package com.alibaba.cloud.ai.dataagent.dto.search;
 
-import com.alibaba.cloud.ai.dataagent.dto.schema.SchemaDTO;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
 import lombok.Data;
 
-@AllArgsConstructor
-@Builder
 @Data
-public class SqlGenerationDTO {
+public class VectorStoreSearchTestRequest {
 
-	private String evidence;
-
+	/**
+	 * Vector search query text.
+	 */
 	private String query;
 
-	private SchemaDTO schemaDTO;
+	/**
+	 * Maximum number of documents to return.
+	 */
+	private Integer topK;
 
-	private String previousStepResults;
+	/**
+	 * Minimum similarity score. Null keeps SearchRequest default.
+	 */
+	private Double similarityThreshold;
 
-	private String sql;
-
-	private String exceptionMessage;
-
-	private String executionDescription;
-
-	private String dialect;
-
-	private Integer datasourceId;
+	/**
+	 * Spring AI filter expression text, for example: datasourceId == '4' && vectorType ==
+	 * 'TABLE'.
+	 */
+	private String filterExpression;
 
 }

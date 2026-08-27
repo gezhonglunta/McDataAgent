@@ -76,4 +76,7 @@ public interface AgentDatasourceMapper {
 	@Delete("DELETE FROM agent_datasource WHERE agent_id = #{agentId} AND datasource_id = #{datasourceId}")
 	int removeRelation(@Param("agentId") Long agentId, @Param("datasourceId") Integer datasourceId);
 
+	@Select("SELECT id FROM agent_datasource WHERE agent_id = #{agentId} AND datasource_id = #{datasourceId}")
+	int getIdByAgentIdAndDatasourceId(@Param("agentId") Long agentId, @Param("datasourceId") Integer datasourceId);
+
 }

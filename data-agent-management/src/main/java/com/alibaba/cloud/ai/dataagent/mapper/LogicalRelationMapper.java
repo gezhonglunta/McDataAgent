@@ -78,6 +78,12 @@ public interface LogicalRelationMapper {
 	int deleteById(@Param("id") Integer id);
 
 	/**
+	 * 物理删除全部外键
+	 */
+	@Delete("DELETE from logical_relation where datasource_id = #{datasourceId}")
+	int deleteAll(@Param("datasourceId") Integer datasourceId);
+
+	/**
 	 * 逻辑删除数据源下的所有逻辑外键
 	 */
 	@Update("UPDATE logical_relation SET is_deleted = 1, updated_time = NOW() WHERE datasource_id = #{datasourceId}")

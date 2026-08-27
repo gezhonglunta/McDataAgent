@@ -56,7 +56,7 @@ public class ModelConfigDTO {
 	private Double temperature = 0.0;
 
 	@Builder.Default
-	private Integer maxTokens = 2000;
+	private Integer maxTokens = 10000;
 
 	@Builder.Default
 	private Boolean isActive = true;

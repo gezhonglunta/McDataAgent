@@ -23,6 +23,7 @@ import com.alibaba.cloud.ai.dataagent.mapper.AgentDatasourceMapper;
 import com.alibaba.cloud.ai.dataagent.mapper.AgentDatasourceTablesMapper;
 import com.alibaba.cloud.ai.dataagent.service.datasource.AgentDatasourceService;
 import com.alibaba.cloud.ai.dataagent.service.datasource.DatasourceService;
+import com.alibaba.cloud.ai.dataagent.service.datasource.McDatasourceService;
 import com.alibaba.cloud.ai.dataagent.service.schema.SchemaService;
 import java.util.List;
 import java.util.Optional;
@@ -44,6 +45,8 @@ public class AgentDatasourceServiceImpl implements AgentDatasourceService {
 	private final AgentDatasourceMapper agentDatasourceMapper;
 
 	private final AgentDatasourceTablesMapper tablesMapper;
+
+	private final McDatasourceService mcDatasourceService;
 
 	@Override
 	public Boolean initializeSchemaForAgentWithDatasource(Long agentId, Integer datasourceId, List<String> tables) {
@@ -73,6 +76,8 @@ public class AgentDatasourceServiceImpl implements AgentDatasourceService {
 
 			log.info("Created SchemaInitRequest for agent: {}, datasource: {}, tableCount: {}", agentIdStr,
 					datasourceId, tablesToInitialize.size());
+
+			mcDatasourceService.saveMcLogicalRelations(agentId, datasourceId);
 
 			// Call the original initialization method
 			return schemaService.schema(datasourceId, schemaInitRequest);

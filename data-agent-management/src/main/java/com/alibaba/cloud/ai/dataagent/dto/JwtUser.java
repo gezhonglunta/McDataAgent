@@ -1,5 +1,5 @@
 /*
- * Copyright 2024-2026 the original author or authors.
+ * Copyright 2026 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,34 +13,17 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.alibaba.cloud.ai.dataagent.dto.prompt;
+package com.alibaba.cloud.ai.dataagent.dto;
 
-import com.alibaba.cloud.ai.dataagent.dto.schema.SchemaDTO;
 import lombok.AllArgsConstructor;
-import lombok.Builder;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
-@AllArgsConstructor
-@Builder
 @Data
-public class SqlGenerationDTO {
+@NoArgsConstructor
+@AllArgsConstructor
+public class JwtUser {
 
-	private String evidence;
-
-	private String query;
-
-	private SchemaDTO schemaDTO;
-
-	private String previousStepResults;
-
-	private String sql;
-
-	private String exceptionMessage;
-
-	private String executionDescription;
-
-	private String dialect;
-
-	private Integer datasourceId;
+	private String userId;
 
 }
