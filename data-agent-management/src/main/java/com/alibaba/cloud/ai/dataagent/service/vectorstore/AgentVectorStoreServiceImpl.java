@@ -119,7 +119,10 @@ public class AgentVectorStoreServiceImpl implements AgentVectorStoreService {
 		Assert.notNull(agentId, "AgentId cannot be null.");
 		Assert.notEmpty(documents, "Documents cannot be empty.");
 		validateDocumentMetadata(agentId, documents);
-		vectorStore.add(documents);
+		// 分批写入，避免 Elasticsearch 等向量库单个 bulk 请求体过大触发 413
+		for (List<Document> batch : partition(documents, dataAgentProperties.getVectorStore().getAddBatchSize())) {
+			vectorStore.add(batch);
+		}
 	}
 
 	private void validateDocumentMetadata(String ownerId, List<Document> documents) {
@@ -350,19 +353,25 @@ public class AgentVectorStoreServiceImpl implements AgentVectorStoreService {
 		List<String> newDocumentIds = replacementDocuments.stream().map(Document::getId).toList();
 		Set<String> newDocumentIdSet = new HashSet<>(newDocumentIds);
 		try {
-			vectorStore.add(replacementDocuments);
+			// 分批写入，避免 Elasticsearch 等向量库单个 bulk 请求体过大触发 413
+			for (List<Document> batch : partition(replacementDocuments,
+					dataAgentProperties.getVectorStore().getAddBatchSize())) {
+				vectorStore.add(batch);
+			}
 			List<String> oldDocumentIds = oldDocuments.stream()
 				.map(Document::getId)
 				.filter(id -> !newDocumentIdSet.contains(id))
 				.toList();
-			if (!oldDocumentIds.isEmpty()) {
-				vectorStore.delete(oldDocumentIds);
+			for (List<String> batch : partition(oldDocumentIds,
+					dataAgentProperties.getVectorStore().getAddBatchSize())) {
+				vectorStore.delete(batch);
 			}
 		}
 		catch (Exception replacementFailure) {
 			try {
-				if (!newDocumentIds.isEmpty()) {
-					vectorStore.delete(newDocumentIds);
+				for (List<String> batch : partition(newDocumentIds,
+						dataAgentProperties.getVectorStore().getAddBatchSize())) {
+					vectorStore.delete(batch);
 				}
 			}
 			catch (Exception rollbackFailure) {
@@ -379,6 +388,15 @@ public class AgentVectorStoreServiceImpl implements AgentVectorStoreService {
 						"Replacement document metadata does not match identity key: " + identity.getKey());
 			}
 		}
+	}
+
+	private static <T> List<List<T>> partition(List<T> list, int batchSize) {
+		Assert.isTrue(batchSize > 0, "Batch size must be greater than zero.");
+		List<List<T>> partitions = new ArrayList<>();
+		for (int i = 0; i < list.size(); i += batchSize) {
+			partitions.add(list.subList(i, Math.min(i + batchSize, list.size())));
+		}
+		return partitions;
 	}
 
 	private List<Document> ensureFreshDocumentIds(List<Document> documents, Set<String> oldDocumentIds) {

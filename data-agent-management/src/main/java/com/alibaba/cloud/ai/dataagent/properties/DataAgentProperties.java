@@ -278,6 +278,12 @@ public class DataAgentProperties {
 		private int batchDelTopkLimit = 5000;
 
 		/**
+		 * 一次添加操作中，最多添加的文档数量 用于避免 Elasticsearch 等向量库单个 bulk 请求体过大触发 413（Request Entity Too
+		 * Large）
+		 */
+		private int addBatchSize = 100;
+
+		/**
 		 * Expected embedding dimension for the configured persistent vector store. A
 		 * value of 0 disables the check, which is useful for the development-only simple
 		 * store.
