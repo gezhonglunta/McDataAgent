@@ -9,6 +9,8 @@ springdoc:
 
 # 存储 DataAgent 业务数据的数据库，并非Agent分析数据的来源
 spring:
+  profiles:
+    active: elasticsearch
   codec:
     # Python workflow timelines can contain generated code, result data and the final report.
     max-in-memory-size: 10MB
