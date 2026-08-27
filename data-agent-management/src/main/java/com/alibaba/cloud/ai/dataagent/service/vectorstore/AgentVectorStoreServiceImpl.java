@@ -304,18 +304,27 @@ public class AgentVectorStoreServiceImpl implements AgentVectorStoreService {
 		return !getDocumentsOnlyByFilter(filter, 1).isEmpty();
 	}
 
+	private static final int TABLE_NAME_BATCH_SIZE = 100;
+
 	@Override
 	public boolean hasTableDocuments(Integer datasourceId, List<String> tableNames) {
 		Assert.notNull(datasourceId, "DatasourceId cannot be null.");
 		Assert.notEmpty(tableNames, "Table names cannot be empty.");
-		Filter.Expression filter = DynamicFilterService.buildFilterExpressionForSearchTables(datasourceId, tableNames);
-		List<Document> documents = getDocumentsOnlyByFilter(filter, tableNames.size() + 5);
-		Set<String> storedTableNames = documents.stream()
-			.map(document -> document.getMetadata().get(DocumentMetadataConstant.NAME))
-			.filter(Objects::nonNull)
-			.map(Object::toString)
-			.collect(java.util.stream.Collectors.toSet());
-		return storedTableNames.containsAll(tableNames);
+		// 分批查询，避免表名太多导致 IN 条件过大、topK 超限，从而查询失败
+		for (int i = 0; i < tableNames.size(); i += TABLE_NAME_BATCH_SIZE) {
+			List<String> batch = tableNames.subList(i, Math.min(i + TABLE_NAME_BATCH_SIZE, tableNames.size()));
+			Filter.Expression filter = DynamicFilterService.buildFilterExpressionForSearchTables(datasourceId, batch);
+			Set<String> storedTableNames = getDocumentsOnlyByFilter(filter, batch.size() + 5).stream()
+				.map(document -> document.getMetadata().get(DocumentMetadataConstant.NAME))
+				.filter(Objects::nonNull)
+				.map(Object::toString)
+				.collect(java.util.stream.Collectors.toSet());
+			// 只要有一页不满足，立刻返回 false
+			if (!storedTableNames.containsAll(batch)) {
+				return false;
+			}
+		}
+		return true;
 	}
 
 	@Override
