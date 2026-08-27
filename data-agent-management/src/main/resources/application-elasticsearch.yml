@@ -3,6 +3,8 @@ spring:
     uris: ${ELASTICSEARCH_URIS:http://190.160.2.132:9200}
     username: ${ELASTICSEARCH_USERNAME:}
     password: ${ELASTICSEARCH_PASSWORD:}
+    connection-timeout: ${ELASTICSEARCH_CONNECTION_TIMEOUT:10s}
+    socket-timeout: ${ELASTICSEARCH_SOCKET_TIMEOUT:60s}
   ai:
     vectorstore:
       type: elasticsearch
