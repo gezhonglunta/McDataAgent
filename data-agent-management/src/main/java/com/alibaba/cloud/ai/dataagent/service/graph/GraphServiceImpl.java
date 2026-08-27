@@ -23,6 +23,7 @@ import com.alibaba.cloud.ai.dataagent.workflow.node.PlannerNode;
 import com.alibaba.cloud.ai.dataagent.dto.GraphRequest;
 import com.alibaba.cloud.ai.dataagent.service.graph.Context.MultiTurnContextManager;
 import com.alibaba.cloud.ai.dataagent.service.graph.Context.StreamContext;
+import com.alibaba.cloud.ai.dataagent.util.TraceIdMdcUtil;
 import com.alibaba.cloud.ai.dataagent.vo.GraphNodeResponse;
 import com.alibaba.cloud.ai.graph.*;
 import com.alibaba.cloud.ai.graph.checkpoint.BaseCheckpointSaver;
@@ -80,36 +81,27 @@ public class GraphServiceImpl implements GraphService {
 	@Override
 	public String nl2sql(String naturalQuery, String agentId) throws GraphRunnerException {
 		RunnableConfig config = RunnableConfig.builder().threadId(UUID.randomUUID().toString()).build();
-		try {
-			OverAllState state = compiledGraph
-				.invoke(Map.of(IS_ONLY_NL2SQL, true, INPUT_KEY, naturalQuery, AGENT_ID, agentId), config)
-				.orElseThrow();
-			return state.value(SQL_GENERATE_OUTPUT, "");
-		}
-		finally {
-			releaseCheckpoint(config);
-		}
+		return TraceIdMdcUtil.callWithMdc(config.threadId().orElse(null), config.threadId().orElse(null), () -> {
+			try {
+				OverAllState state = compiledGraph
+					.invoke(Map.of(IS_ONLY_NL2SQL, true, INPUT_KEY, naturalQuery, AGENT_ID, agentId), config)
+					.orElseThrow();
+				return state.value(SQL_GENERATE_OUTPUT, "");
+			}
+			finally {
+				releaseCheckpoint(config);
+			}
+		});
 	}
 
 	@Override
 	public void graphStreamProcess(Sinks.Many<ServerSentEvent<GraphNodeResponse>> sink, GraphRequest graphRequest) {
 		boolean resuming = StringUtils.hasText(graphRequest.getHumanFeedbackContent());
-		if (!resuming) {
-			if (!StringUtils.hasText(graphRequest.getConversationId())) {
-				graphRequest.setConversationId(StringUtils.hasText(graphRequest.getThreadId())
-						? graphRequest.getThreadId() : UUID.randomUUID().toString());
-			}
-			graphRequest.setThreadId(UUID.randomUUID().toString());
-		}
-		else if (!StringUtils.hasText(graphRequest.getThreadId())) {
-			throw new IllegalArgumentException("Graph run ID is required when resuming human feedback");
-		}
-		if (!StringUtils.hasText(graphRequest.getConversationId())) {
-			// Compatibility for existing clients: their old threadId was both the
-			// conversation ID and graph run ID.
-			graphRequest.setConversationId(graphRequest.getThreadId());
-		}
+		graphRequest.normalizeIds();
 		String threadId = graphRequest.getThreadId();
+		// 以规范化后的 ID 刷新当前线程 MDC，
+		// 使随后提交的订阅任务（subscribeToFlux 的 wrap 捕获）与同步日志均使用准确值
+		TraceIdMdcUtil.put(graphRequest.getConversationId(), threadId);
 		// 创建或获取 StreamContext
 		StreamContext context = streamContextMap.computeIfAbsent(threadId, k -> new StreamContext());
 		context.setConversationId(graphRequest.getConversationId());
@@ -131,6 +123,13 @@ public class GraphServiceImpl implements GraphService {
 		if (!StringUtils.hasText(threadId)) {
 			return;
 		}
+		StreamContext context = streamContextMap.get(threadId);
+		String traceId = context != null && StringUtils.hasText(context.getConversationId())
+				? context.getConversationId() : threadId;
+		TraceIdMdcUtil.runWithMdc(traceId, threadId, () -> stopStreamProcessingInternal(threadId));
+	}
+
+	private void stopStreamProcessingInternal(String threadId) {
 		log.info("Stopping stream processing for threadId: {}", threadId);
 		StreamContext context = streamContextMap.remove(threadId);
 		multiTurnContextManager.discardPending(context != null ? context.getConversationId() : threadId);
@@ -252,28 +251,30 @@ public class GraphServiceImpl implements GraphService {
 	 */
 	private void subscribeToFlux(StreamContext context, Flux<NodeOutput> nodeOutputFlux, GraphRequest graphRequest,
 			String agentId, String threadId) {
-		CompletableFuture.runAsync(() -> {
-			// 在订阅之前检查上下文是否仍然有效
-			if (context.isCleaned()) {
-				log.debug("StreamContext cleaned before subscription for threadId: {}", threadId);
-				return;
-			}
-			Disposable disposable = nodeOutputFlux.subscribe(output -> handleNodeOutput(graphRequest, output),
-					error -> handleStreamError(graphRequest, error), () -> handleStreamComplete(graphRequest));
-			// 原子性地设置 Disposable，如果已经清理则立即释放
-			synchronized (context) {
+		CompletableFuture.runAsync(TraceIdMdcUtil.wrap(() -> {
+				// normalizeIds 可能在任务提交后完成（如新会话生成 threadId），此处用规范化后的 ID 覆盖 MDC
+				TraceIdMdcUtil.put(graphRequest.getConversationId(), threadId);
+				// 在订阅之前检查上下文是否仍然有效
 				if (context.isCleaned()) {
-					// 如果已经清理，立即释放刚创建的 Disposable
-					if (disposable != null && !disposable.isDisposed()) {
-						disposable.dispose();
+					log.debug("StreamContext cleaned before subscription for threadId: {}", threadId);
+					return;
+				}
+				Disposable disposable = nodeOutputFlux.subscribe(output -> handleNodeOutput(graphRequest, output),
+						error -> handleStreamError(graphRequest, error), () -> handleStreamComplete(graphRequest));
+				// 原子性地设置 Disposable，如果已经清理则立即释放
+				synchronized (context) {
+					if (context.isCleaned()) {
+						// 如果已经清理，立即释放刚创建的 Disposable
+						if (disposable != null && !disposable.isDisposed()) {
+							disposable.dispose();
+						}
+					}
+					else {
+						// 只有在未清理的情况下才设置 Disposable
+						context.setDisposable(disposable);
 					}
 				}
-				else {
-					// 只有在未清理的情况下才设置 Disposable
-					context.setDisposable(disposable);
-				}
-			}
-		}, executor);
+			}), executor);
 	}
 
 	/**

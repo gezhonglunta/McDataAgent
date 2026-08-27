@@ -18,6 +18,7 @@ package com.alibaba.cloud.ai.dataagent.controller;
 import com.alibaba.cloud.ai.dataagent.dto.GraphRequest;
 import com.alibaba.cloud.ai.dataagent.enums.GraphEventType;
 import com.alibaba.cloud.ai.dataagent.service.graph.GraphService;
+import com.alibaba.cloud.ai.dataagent.util.TraceIdMdcUtil;
 import com.alibaba.cloud.ai.dataagent.vo.GraphNodeResponse;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -71,7 +72,15 @@ public class GraphController {
 			.rejectedPlan(rejectedPlan)
 			.nl2sqlOnly(nl2sqlOnly)
 			.build();
-		graphService.graphStreamProcess(sink, request);
+		// graphStreamProcess 内部会规范化会话/运行 ID（同一 request 实例），
+		// 之后以规范化结果作为 traceId（conversationId）/ runId（threadId）
+		TraceIdMdcUtil.put(request.getConversationId(), request.getThreadId());
+		try {
+			graphService.graphStreamProcess(sink, request);
+		}
+		finally {
+			TraceIdMdcUtil.clear();
+		}
 
 		return sink.asFlux().filter(sse -> {
 			// 1. 如果 event 是 "complete" 或 "error"，直接放行（不管 text 是否为空）
@@ -87,32 +96,36 @@ public class GraphController {
 			// 判断字符串是否为空
 			return sse.data() != null && sse.data().getText() != null && !sse.data().getText().isEmpty();
 		})
-			.doOnSubscribe(subscription -> log.info("Client subscribed to stream, threadId: {}", request.getThreadId()))
-			.doOnCancel(() -> {
+			.doOnSubscribe(subscription -> TraceIdMdcUtil.runWithMdc(request.getConversationId(), request.getThreadId(),
+				() -> log.info("Client subscribed to stream, threadId: {}", request.getThreadId())))
+			.doOnCancel(() -> TraceIdMdcUtil.runWithMdc(request.getConversationId(), request.getThreadId(), () -> {
 				log.info("Client disconnected from stream, threadId: {}", request.getThreadId());
 				if (request.getThreadId() != null) {
 					graphService.stopStreamProcessing(request.getThreadId());
 				}
-			})
-			.doOnError(e -> {
+			}))
+			.doOnError(e -> TraceIdMdcUtil.runWithMdc(request.getConversationId(), request.getThreadId(), () -> {
 				log.error("Error occurred during streaming, threadId: {}: ", request.getThreadId(), e);
 				if (request.getThreadId() != null) {
 					graphService.stopStreamProcessing(request.getThreadId());
 				}
-			})
-			.doOnComplete(() -> log.info("Stream completed successfully, threadId: {}", request.getThreadId()));
+			}))
+			.doOnComplete(() -> TraceIdMdcUtil.runWithMdc(request.getConversationId(), request.getThreadId(),
+					() -> log.info("Stream completed successfully, threadId: {}", request.getThreadId())));
 	}
 
 	@PostMapping("/stream/stop")
 	public ResponseEntity<Void> stopStream(@RequestParam("conversationId") String conversationId,
 			@RequestParam(value = "threadId", required = false) String threadId) {
-		if (StringUtils.hasText(threadId)) {
-			graphService.stopStreamProcessing(threadId);
-		}
-		else {
-			graphService.stopStreamProcessingByConversationId(conversationId);
-		}
-		return ResponseEntity.noContent().build();
+		return TraceIdMdcUtil.callWithMdc(conversationId, threadId, () -> {
+			if (StringUtils.hasText(threadId)) {
+				graphService.stopStreamProcessing(threadId);
+			}
+			else {
+				graphService.stopStreamProcessingByConversationId(conversationId);
+			}
+			return ResponseEntity.noContent().build();
+		});
 	}
 
 }

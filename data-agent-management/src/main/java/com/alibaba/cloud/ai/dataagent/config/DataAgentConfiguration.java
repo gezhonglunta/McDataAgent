@@ -31,6 +31,7 @@ import com.alibaba.cloud.ai.transformer.splitter.RecursiveCharacterTextSplitter;
 import com.alibaba.cloud.ai.dataagent.splitter.SemanticTextSplitter;
 import com.alibaba.cloud.ai.dataagent.splitter.ParagraphTextSplitter;
 import com.alibaba.cloud.ai.dataagent.util.McpServerToolUtil;
+import com.alibaba.cloud.ai.dataagent.util.MdcPropagatingScheduledExecutorService;
 import com.alibaba.cloud.ai.dataagent.util.NodeBeanUtil;
 import com.alibaba.cloud.ai.dataagent.service.aimodelconfig.AiModelRegistry;
 import com.alibaba.cloud.ai.dataagent.service.aimodelconfig.EmbeddingModelCompatibilityValidator;
@@ -82,8 +83,10 @@ import org.springframework.context.support.GenericApplicationContext;
 import org.springframework.http.client.reactive.ReactorClientHttpConnector;
 import org.springframework.scheduling.annotation.EnableAsync;
 import org.springframework.web.reactive.function.client.WebClient;
+import reactor.core.scheduler.Schedulers;
 import reactor.netty.http.client.HttpClient;
 
+import jakarta.annotation.PostConstruct;
 import javax.sql.DataSource;
 import java.time.Duration;
 import java.util.*;
@@ -440,6 +443,16 @@ public class DataAgentConfiguration implements DisposableBean {
 
 		// 3. 返回动态生成的代理对象
 		return (EmbeddingModel) proxyFactory.getProxy();
+	}
+
+	/**
+	 * 注册 Reactor Scheduler 装饰器，使所有 Schedulers 创建的调度线程自动传播会话 MDC（traceId/runId），
+	 * 保证图中异步节点（AsyncNodeAction / edge_async）日志可串联。必须在任何 Scheduler 创建之前注册。
+	 */
+	@PostConstruct
+	public void registerMdcSchedulerDecorator() {
+		Schedulers.addExecutorServiceDecorator("dataagent-mdc",
+				(scheduler, executorService) -> new MdcPropagatingScheduledExecutorService(executorService));
 	}
 
 	@Bean(name = "dbOperationExecutor")
