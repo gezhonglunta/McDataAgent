@@ -11,8 +11,9 @@ setlocal
 set "BASE_DIR=%~dp0.."
 cd /d "%BASE_DIR%"
 
+set SERVER_PORT=8780
 if not defined JAVA_OPTS set "JAVA_OPTS=-Xms512m -Xmx4g -Dfile.encoding=UTF-8 -Duser.timezone=Asia/Shanghai"
 
-java %JAVA_OPTS% -Dloader.path=lib -Dspring.config.additional-location=optional:file:./config/ -jar data-agent.jar %*
+java %JAVA_OPTS% -Dloader.path=lib -Dspring.config.additional-location=optional:file:./config/ -jar data-agent.jar --server.port=%SERVER_PORT% %*
 
 endlocal

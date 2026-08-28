@@ -28,6 +28,8 @@ import com.alibaba.cloud.ai.dataagent.dto.schema.SchemaDTO;
 import com.alibaba.cloud.ai.dataagent.dto.schema.TableDTO;
 import com.alibaba.cloud.ai.dataagent.entity.SemanticModel;
 import com.alibaba.cloud.ai.dataagent.entity.UserPromptConfig;
+import com.alibaba.cloud.ai.dataagent.service.ApplicationContextHelper;
+import com.alibaba.cloud.ai.dataagent.service.datasource.McDatasourceService;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.BooleanUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -132,7 +134,8 @@ public class PromptHelper {
 		params.put("execution_description", semanticConsistencyDTO.getExecutionDescription());
 		params.put("user_query", semanticConsistencyDTO.getUserQuery());
 		params.put("evidence", semanticConsistencyDTO.getEvidence());
-		params.put("schema_info", semanticConsistencyDTO.getSchemaInfo());
+		params.put("schema_info", ApplicationContextHelper.getBean(McDatasourceService.class)
+				.extBuildSemanticConsistenPrompt(semanticConsistencyDTO.getSchemaInfo()));
 		params.put("sql", semanticConsistencyDTO.getSql());
 		BeanOutputConverter<SemanticConsistencyOutputDTO> beanOutputConverter = new BeanOutputConverter<>(
 				SemanticConsistencyOutputDTO.class);
@@ -204,6 +207,7 @@ public class PromptHelper {
 		String semanticModel = CollectionUtils.isEmpty(semanticModels) ? ""
 				: semanticModels.stream().map(SemanticModel::getPromptInfo).collect(Collectors.joining(";\n"));
 		params.put("semanticModel", semanticModel);
+		ApplicationContextHelper.getBean(McDatasourceService.class).extBuildSemanticModelPrompt(semanticModels, params);
 		return PromptConstant.getSemanticModelPromptTemplate().render(params);
 	}
 

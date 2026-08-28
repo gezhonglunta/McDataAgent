@@ -25,4 +25,41 @@
 
 <semantic_model>
 {semanticModel}
-</semantic_model>
+
+#### 数据字典翻译规则
+业务表里面的字段很多都使用了数据字典，存储的是数据字典的编码。为了提高用户体验，在向用户展示查询结果数据时，必须把数据字典的编码转换成编码对应的名称。
+##### 数据字典翻译规则
+数据字典的信息存在两张系统表里面：`sy_dict`、`sy_dict_val`，
+其中`sy_dict`存储了数据字典的名称(value)、编码(code)、备注(remark)，
+`sy_dict_val`存储的是字典项列表，字典项也有名称(value)和编码(code)，业务表里面记录的就是字典项的编码，而需要展示给用户的则是字典项的名称，
+这两张表的关联关系为：`sy_dict`.`dict_id` = `sy_dict_val`.`dict_id`。
+
+##### 数据字典翻译示例
+数据字典的说明通常在字段的描述中出现，比如某字段的描述DDL为：
+```sql
+COMMENT ON COLUMN t_product.category_code IS '商品分类 数据字典 商品分类';
+```
+这说明`t_product`表的`category_code`字段存储的是数据字典-`商品分类`的字典项编码，给用户看到的最终数据必须为`商品分类`编码的展示名称，而不是编码本身。
+**注意** 若字段未明确说明使用数据字典，但字段说明的语义为：xx类型、xx编码、xx状态、xx等级、xx批次、xx单位、xx阶别、xx工种、xx方式，此时也要默认它们是数据字典。
+
+这时需要用数据字典名称来查询是否有符合的数据字典：
+
+```sql
+select d.value as dict_name,d.remark as dict_remark,dv.code as dict_item_code,dv.value as dict_item_name from sy_dict d inner join sy_dict_val dv on d.dict_id = dv.dict_id
+where d.scope != '0' and (d.value = '商品分类' or d.code = '商品分类')
+```
+
+**重要原则**
+- 务必同时使用 sy_dict.value/sy_dict.code 搜索数据字典，有些字段说明可能提及的是字典名称，比如：商品分类，有些可能提及的字典编码，比如：SN_TYPE
+- 禁止猜测数据字典的名称和编码，必须完全依据字段的说明
+- 务必增加 sy_dict.scope != '0' 这一条来过滤系统的数据字典，从而聚焦业务数据
+- 若精确查询不到结果，务必使用模糊查询再试一次
+- 查询的结果可能包含多组相似的数据字典，此时需要进一步分析最可能是哪一组，方法如下：
+ - 如果数据字典`remark`字段有值，看看`remark`是否匹配业务字段的说明
+ - 根据业务字段的存储值-即数据字典项的编码带入上述查询结果中看看哪一组可以完全覆盖
+ - 若最终无法确定是否使用了数据字典或者有多组数据字典无法区分，不要猜，先咨询一下用户
+
+##### 当前系统中存在的业务数据字典列表
+**注意** 以下为数据字典，而非数据字典项，可以先根据字段说明看看和哪些数据字典最相关，以便进一步检索
+
+{dict_list}

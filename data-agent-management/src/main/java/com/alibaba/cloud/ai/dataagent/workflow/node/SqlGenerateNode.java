@@ -15,17 +15,17 @@
  */
 package com.alibaba.cloud.ai.dataagent.workflow.node;
 
+import com.alibaba.cloud.ai.dataagent.dto.datasource.SqlRetryDto;
 import com.alibaba.cloud.ai.dataagent.dto.planner.ExecutionStep;
+import com.alibaba.cloud.ai.dataagent.dto.prompt.SqlGenerationDTO;
+import com.alibaba.cloud.ai.dataagent.dto.schema.SchemaDTO;
 import com.alibaba.cloud.ai.dataagent.enums.TextType;
+import com.alibaba.cloud.ai.dataagent.properties.DataAgentProperties;
+import com.alibaba.cloud.ai.dataagent.service.nl2sql.Nl2SqlService;
 import com.alibaba.cloud.ai.dataagent.util.ChatResponseUtil;
 import com.alibaba.cloud.ai.dataagent.util.FluxUtil;
 import com.alibaba.cloud.ai.dataagent.util.PlanProcessUtil;
 import com.alibaba.cloud.ai.dataagent.util.StateUtil;
-import com.alibaba.cloud.ai.dataagent.properties.DataAgentProperties;
-import com.alibaba.cloud.ai.dataagent.dto.datasource.SqlRetryDto;
-import com.alibaba.cloud.ai.dataagent.dto.prompt.SqlGenerationDTO;
-import com.alibaba.cloud.ai.dataagent.dto.schema.SchemaDTO;
-import com.alibaba.cloud.ai.dataagent.service.nl2sql.Nl2SqlService;
 import com.alibaba.cloud.ai.graph.GraphResponse;
 import com.alibaba.cloud.ai.graph.OverAllState;
 import com.alibaba.cloud.ai.graph.StateGraph;
@@ -41,7 +41,13 @@ import reactor.core.publisher.Flux;
 import java.util.HashMap;
 import java.util.Map;
 
-import static com.alibaba.cloud.ai.dataagent.constant.Constant.*;
+import static com.alibaba.cloud.ai.dataagent.constant.Constant.DB_DIALECT_TYPE;
+import static com.alibaba.cloud.ai.dataagent.constant.Constant.EVIDENCE;
+import static com.alibaba.cloud.ai.dataagent.constant.Constant.SQL_EXECUTE_NODE_OUTPUT;
+import static com.alibaba.cloud.ai.dataagent.constant.Constant.SQL_GENERATE_COUNT;
+import static com.alibaba.cloud.ai.dataagent.constant.Constant.SQL_GENERATE_OUTPUT;
+import static com.alibaba.cloud.ai.dataagent.constant.Constant.SQL_REGENERATE_REASON;
+import static com.alibaba.cloud.ai.dataagent.constant.Constant.TABLE_RELATION_OUTPUT;
 import static com.alibaba.cloud.ai.dataagent.util.PlanProcessUtil.getCurrentExecutionStepInstruction;
 
 /**

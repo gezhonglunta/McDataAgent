@@ -75,7 +75,7 @@ public class DataAgentProperties {
 	/**
 	 * 执行SQL结果图表化超时时间，默认15000ms。结构化输出可能触发 Spring AI 自动修复重试，过短的超时会取消仍在运行的模型请求。
 	 */
-	private Long enrichSqlResultTimeout = 15000L;
+	private Long enrichSqlResultTimeout = 30000L;
 
 	@Getter
 	@Setter
@@ -298,7 +298,7 @@ public class DataAgentProperties {
 		/**
 		 * Maximum wait for each hybrid retrieval branch.
 		 */
-		private long hybridSearchTimeoutMs = 3000;
+		private long hybridSearchTimeoutMs = 10000;
 
 		/**
 		 * Elasticsearch最小分数阈值，用于es执行关键词搜索时过滤相关性较低的文档
