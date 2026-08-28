@@ -1,6 +1,9 @@
 #!/bin/bash
 
-pids=`ps -ef | grep data-agent.jar | grep port=8780 | grep -v grep | awk '{print $2}'`
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+SERVER_PORT="$(grep -E '^SERVER_PORT=[0-9]+' "$SCRIPT_DIR/start.sh" | head -n 1 | cut -d= -f2)"
+
+pids=`ps -ef | grep data-agent.jar | grep port=$SERVER_PORT | grep -v grep | awk '{print $2}'`
 if [[ -n $pids ]]; then
     for pid in ${pids}; do
         echo kill:$pid

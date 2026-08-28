@@ -496,7 +496,6 @@
                         <exclude>application.yml</exclude>
                         <exclude>application-*.yml</exclude>
                         <exclude>logback-spring.xml</exclude>
-                        <exclude>logback-sys.xml</exclude>
                     </excludes>
                 </configuration>
             </plugin>

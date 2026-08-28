@@ -24,10 +24,10 @@ if not exist %local_jar% (
 
 echo Í£Ö¹·þÎñ
 ssh -p %port% root@%host% "cd %remote_backend%/bin && sh stop.sh"
-timeout /t 30
+timeout /t 5
 
 scp -P %port% %local_jar% root@%host%:%remote_backend%
-scp -P %port% -r .\data-agent-management\target\lib root@%host%:%remote_backend%
+rem scp -P %port% -r .\data-agent-management\target\lib root@%host%:%remote_backend%
 scp -P %port% -r .\data-agent-management\target\config root@%host%:%remote_backend%
 scp -P %port% -r .\data-agent-management\target\bin root@%host%:%remote_backend%
 
