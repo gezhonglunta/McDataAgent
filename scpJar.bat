@@ -15,7 +15,7 @@ if "%param%"=="1" (
 )
 
 
-set local_jar=.\data-agent-management\target\spring-ai-alibaba-data-agent-management-1.0.0-SNAPSHOT.jar
+set local_jar=.\data-agent-management\target\data-agent.jar
 
 if not exist %local_jar% (
     echo 发布包不存在
@@ -23,12 +23,15 @@ if not exist %local_jar% (
 )
 
 echo 停止服务
-ssh -p %port% root@%host% "cd %remote_backend% && sh stop.sh"
+ssh -p %port% root@%host% "cd %remote_backend%/bin && sh stop.sh"
 timeout /t 30
 
 scp -P %port% %local_jar% root@%host%:%remote_backend%
+scp -P %port% -r .\data-agent-management\target\lib root@%host%:%remote_backend%
+scp -P %port% -r .\data-agent-management\target\config root@%host%:%remote_backend%
+scp -P %port% -r .\data-agent-management\target\bin root@%host%:%remote_backend%
 
 echo 开启服务
-ssh -p %port% root@%host% "cd %remote_backend% && sh start_sso.sh"
+ssh -p %port% root@%host% "cd %remote_backend%/bin && sh start.sh"
 
 pause

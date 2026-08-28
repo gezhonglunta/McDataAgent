@@ -412,6 +412,7 @@
     </repositories>
 
     <build>
+        <finalName>data-agent</finalName>
         <plugins>
             <!-- JaCoCo Code Coverage Plugin -->
             <plugin>
@@ -485,11 +486,95 @@
                     </execution>
                 </executions>
             </plugin>
+            <!-- 生成小的核心 jar，依赖由 PropertiesLauncher 从 lib 目录加载 -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-jar-plugin</artifactId>
+                <version>3.4.1</version>
+                <configuration>
+                    <excludes>
+                        <exclude>application.yml</exclude>
+                        <exclude>application-*.yml</exclude>
+                        <exclude>logback-spring.xml</exclude>
+                        <exclude>logback-sys.xml</exclude>
+                    </excludes>
+                </configuration>
+            </plugin>
+            <!-- 复制依赖 jar 到 target/lib -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-dependency-plugin</artifactId>
+                <version>3.8.1</version>
+                <executions>
+                    <execution>
+                        <id>copy-dependencies</id>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>copy-dependencies</goal>
+                        </goals>
+                        <configuration>
+                            <outputDirectory>${project.build.directory}/lib</outputDirectory>
+                            <includeScope>runtime</includeScope>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <!-- 复制外部配置文件到 target/config -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-resources-plugin</artifactId>
+                <version>3.3.1</version>
+                <executions>
+                    <execution>
+                        <id>copy-config</id>
+                        <phase>prepare-package</phase>
+                        <goals>
+                            <goal>copy-resources</goal>
+                        </goals>
+                        <configuration>
+                            <outputDirectory>${project.build.directory}/config</outputDirectory>
+                            <resources>
+                                <resource>
+                                    <directory>${project.basedir}/src/main/resources</directory>
+                                    <includes>
+                                        <include>application*.yml</include>
+                                        <include>logback-spring.xml</include>
+                                        <include>logback-sys.xml</include>
+                                    </includes>
+                                </resource>
+                            </resources>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>copy-scripts</id>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>copy-resources</goal>
+                        </goals>
+                        <configuration>
+                            <outputDirectory>${project.build.directory}/bin</outputDirectory>
+                            <resources>
+                                <resource>
+                                    <directory>${project.basedir}/src/main/scripts</directory>
+                                </resource>
+                            </resources>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
                 <configuration>
                     <mainClass>com.alibaba.cloud.ai.dataagent.DataAgentApplication</mainClass>
+                    <!-- PropertiesLauncher 布局：依赖不进 jar，通过 loader.path 指定外部 lib 目录 -->
+                    <layout>ZIP</layout>
+                    <includes>
+                        <include>
+                            <groupId>io.placeholder</groupId>
+                            <artifactId>noop</artifactId>
+                        </include>
+                    </includes>
                 </configuration>
                 <executions>
                     <execution>
