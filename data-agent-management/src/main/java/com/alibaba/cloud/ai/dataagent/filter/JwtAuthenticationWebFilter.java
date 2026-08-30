@@ -26,22 +26,22 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpCookie;
-import org.springframework.http.ResponseCookie;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseCookie;
 import org.springframework.stereotype.Component;
 import org.springframework.web.server.ServerWebExchange;
 import org.springframework.web.server.WebFilter;
 import org.springframework.web.server.WebFilterChain;
 import reactor.core.publisher.Mono;
 
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.SignatureException;
 import java.util.Base64;
-import javax.crypto.Mac;
-import javax.crypto.spec.SecretKeySpec;
 
 @Slf4j
 @Component
@@ -124,11 +124,10 @@ public class JwtAuthenticationWebFilter implements WebFilter {
 		if ("/".equals(path) || "/index.html".equals(path)) {
 			return true;
 		}
-		if (path.startsWith("/front/assets") || path.startsWith("/assets") || path.startsWith("/front/vendor")
-				|| path.startsWith("/vendor")) {
+		if (path.startsWith("/_nuxt")) {
 			return true;
 		}
-		if (path.startsWith("/front/") && !path.startsWith("/front/api/") && !path.startsWith("/front/assets")) {
+		if (path.startsWith("/front/") && !path.startsWith("/front/api/") && !path.startsWith("/front/_nuxt")) {
 			return !path.contains(".");
 		}
 		if (path.contains(".")) {
@@ -244,11 +243,11 @@ public class JwtAuthenticationWebFilter implements WebFilter {
 			return;
 		}
 		ResponseCookie cookie = ResponseCookie.from(userContextCookieName, signedValue)
-			.httpOnly(true)
-			.secure("https".equalsIgnoreCase(exchange.getRequest().getURI().getScheme()))
-			.sameSite(userContextCookieSameSite)
-			.path(resolveCookiePath())
-			.build();
+				.httpOnly(true)
+				.secure("https".equalsIgnoreCase(exchange.getRequest().getURI().getScheme()))
+				.sameSite(userContextCookieSameSite)
+				.path(resolveCookiePath())
+				.build();
 		exchange.getResponse().addCookie(cookie);
 	}
 
@@ -284,8 +283,7 @@ public class JwtAuthenticationWebFilter implements WebFilter {
 		}
 		try {
 			return new String(Base64.getUrlDecoder().decode(parts[0]), StandardCharsets.UTF_8);
-		}
-		catch (IllegalArgumentException ex) {
+		} catch (IllegalArgumentException ex) {
 			return null;
 		}
 	}
@@ -296,8 +294,7 @@ public class JwtAuthenticationWebFilter implements WebFilter {
 		}
 		try {
 			return Base64.getDecoder().decode(userContextCookieSecret);
-		}
-		catch (IllegalArgumentException ex) {
+		} catch (IllegalArgumentException ex) {
 			log.warn("User context cookie secret is not valid base64");
 			return null;
 		}
@@ -308,10 +305,9 @@ public class JwtAuthenticationWebFilter implements WebFilter {
 			Mac mac = Mac.getInstance("HmacSHA256");
 			mac.init(new SecretKeySpec(secret, "HmacSHA256"));
 			return Base64.getUrlEncoder()
-				.withoutPadding()
-				.encodeToString(mac.doFinal(value.getBytes(StandardCharsets.UTF_8)));
-		}
-		catch (Exception ex) {
+					.withoutPadding()
+					.encodeToString(mac.doFinal(value.getBytes(StandardCharsets.UTF_8)));
+		} catch (Exception ex) {
 			throw new IllegalStateException("Failed to sign user context cookie", ex);
 		}
 	}
