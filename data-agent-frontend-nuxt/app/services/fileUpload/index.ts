@@ -18,46 +18,55 @@
  * @description 文件上传服务，处理头像等静态资源的上传
  */
 
+import { resolveAssetUrl } from '../../composables/useAssetUrl';
+
 /**
  * @description 文件上传响应接口
  */
 interface UploadResponse {
-  /** 是否成功 */
-  success: boolean;
-  /** 提示消息 */
-  message?: string;
-  /** 上传后的文件 URL */
-  url?: string;
+	/** 是否成功 */
+	success: boolean;
+	/** 提示消息 */
+	message?: string;
+	/** 上传后的文件 URL */
+	url?: string;
 }
 
 /**
  * @description 文件上传 API 封装对象
  */
 export const fileUploadApi = {
-  /**
-   * @description 上传用户头像
-   * @param {File} file - 头像文件对象
-   * @returns {Promise<UploadResponse>} 上传结果
-   */
-  uploadAvatar(file: File): Promise<UploadResponse> {
-    const formData = new FormData();
-    formData.append('file', file);
+	/**
+	 * @description 上传用户头像
+	 * @param {File} file - 头像文件对象
+	 * @returns {Promise<UploadResponse>} 上传结果
+	 */
+	uploadAvatar(file: File): Promise<UploadResponse> {
+		const formData = new FormData();
+		formData.append('file', file);
 
-    const url = '/api/upload/avatar';
-    return fetch(url, {
-      method: 'POST',
-      body: formData,
-    }).then(async response => {
-      if (!response.ok) {
-        const text = await response.text().catch(() => '');
-        throw new Error(`Upload failed: ${response.status} ${text}`);
-      }
-      const ct = response.headers.get('content-type') || '';
-      if (ct.includes('application/json')) {
-        return await response.json();
-      }
-      const text = await response.text();
-      return { success: true, message: 'ok', url: text };
-    });
-  },
+		const {
+			public: { apiBase },
+		} = useRuntimeConfig();
+		const url = `${apiBase}/api/upload/avatar`;
+		return fetch(url, {
+			method: 'POST',
+			body: formData,
+		}).then(async (response) => {
+			if (!response.ok) {
+				const text = await response.text().catch(() => '');
+				throw new Error(`Upload failed: ${response.status} ${text}`);
+			}
+			const ct = response.headers.get('content-type') || '';
+			if (ct.includes('application/json')) {
+				const data = await response.json();
+				if (data && data.url) {
+					data.url = resolveAssetUrl(data.url);
+				}
+				return data;
+			}
+			const text = await response.text();
+			return { success: true, message: 'ok', url: resolveAssetUrl(text) };
+		});
+	},
 };

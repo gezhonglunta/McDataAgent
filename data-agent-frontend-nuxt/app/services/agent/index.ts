@@ -20,6 +20,7 @@
 
 import axios from 'axios';
 import type { ApiResponse } from '../common';
+import { resolveAssetUrl } from '../../composables/useAssetUrl';
 
 /**
  * @description 智能体实体定义
@@ -77,6 +78,16 @@ export type AgentApiKeyApiResult = ApiResponse<AgentApiKeyResponse>;
  */
 class AgentService {
 	/**
+	 * @description 归一化智能体头像地址，给后端返回的相对路径补上部署基座前缀
+	 */
+	private resolveAvatar(agent: Agent): Agent {
+		if (!agent || typeof agent.avatar !== 'string' || !agent.avatar) {
+			return agent;
+		}
+		return { ...agent, avatar: resolveAssetUrl(agent.avatar) };
+	}
+
+	/**
 	 * @description 获取智能体列表
 	 * @param {string} [status] - 状态筛选
 	 * @param {string} [keyword] - 关键词搜索
@@ -90,7 +101,7 @@ class AgentService {
 		const response = await axios.get<Agent[]>(`${API_BASE_URL}/list`, {
 			params,
 		});
-		return response.data;
+		return response.data.map((item) => this.resolveAvatar(item));
 	}
 
 	/**
@@ -101,7 +112,7 @@ class AgentService {
 	async get(id: number): Promise<Agent | null> {
 		try {
 			const response = await axios.get<Agent>(`${API_BASE_URL}/${id}`);
-			return response.data;
+			return this.resolveAvatar(response.data);
 		} catch (error) {
 			if (axios.isAxiosError(error) && error.response?.status === 404) {
 				return null;
@@ -122,7 +133,7 @@ class AgentService {
 		};
 
 		const response = await axios.post<Agent>(API_BASE_URL, agentData);
-		return response.data;
+		return this.resolveAvatar(response.data);
 	}
 
 	/**
@@ -148,7 +159,7 @@ class AgentService {
 				`${API_BASE_URL}/${id}`,
 				agentData,
 			);
-			return response.data;
+			return this.resolveAvatar(response.data);
 		} catch (error) {
 			if (axios.isAxiosError(error) && error.response?.status === 404) {
 				return null;
