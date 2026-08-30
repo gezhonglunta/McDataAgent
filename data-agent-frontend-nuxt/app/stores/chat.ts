@@ -118,7 +118,10 @@ export const useChatStore = defineStore('chat', () => {
 		}
 		if (sessionEventSource) sessionEventSource.close();
 
-		const source = new EventSource(`/api/agent/${agentId}/sessions/stream`);
+		const {
+			public: { apiBase },
+		} = useRuntimeConfig();
+		const source = new EventSource(`${apiBase}/api/agent/${agentId}/sessions/stream`);
 		source.addEventListener('title-updated', (event) => {
 			try {
 				const data = JSON.parse((event as MessageEvent<string>).data) as {

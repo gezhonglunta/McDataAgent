@@ -71,7 +71,13 @@ export default defineNuxtConfig({
 	},
 	//全局动画配置
 	app: {
+		baseURL: '/nl2sql/',
 		pageTransition: { name: 'page', mode: 'out-in' },
+	},
+	runtimeConfig: {
+		public: {
+			apiBase: '/nl2sql',
+		},
 	},
 	css: ['@/assets/css/main.css'],
 });

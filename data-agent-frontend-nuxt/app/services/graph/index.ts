@@ -127,7 +127,10 @@ class GraphService {
       params.append("humanFeedbackContent", request.humanFeedbackContent);
     }
 
-    const url = `${API_BASE_URL}/stream/search?${params.toString()}`;
+    const {
+      public: { apiBase },
+    } = useRuntimeConfig();
+    const url = `${apiBase}${API_BASE_URL}/stream/search?${params.toString()}`;
 
     const eventSource = new EventSource(url);
 
