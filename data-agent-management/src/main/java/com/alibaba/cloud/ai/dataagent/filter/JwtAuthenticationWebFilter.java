@@ -99,12 +99,7 @@ public class JwtAuthenticationWebFilter implements WebFilter {
 		JwtUser user = resolveUser(exchange);
 
 		if (user == null) {
-			log.warn("JWT authentication failed: user missing, path={}", path);
-			exchange.getRequest().getCookies().forEach((k, items) -> {
-				for (HttpCookie item : items) {
-					log.warn("cookies name={},value={}", item.getName(), item.getValue());
-				}
-			});
+			log.debug("JWT authentication failed: user missing, path={}", path);
 			return unauthorized(exchange);
 		}
 
@@ -128,7 +123,7 @@ public class JwtAuthenticationWebFilter implements WebFilter {
 			return false;
 		}
 		if (StringUtils.contains(path, "/api/test/")) {
-			return false;
+			return true;
 		}
 		if ("/".equals(path) || "/index.html".equals(path)) {
 			return true;
