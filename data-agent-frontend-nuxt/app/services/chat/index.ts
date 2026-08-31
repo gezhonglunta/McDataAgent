@@ -36,7 +36,7 @@ export interface ChatSession {
   /** 是否置顶 */
   isPinned: boolean;
   /** 用户 ID */
-  userId?: number;
+  userId?: string;
   /** 创建时间 */
   createTime?: Date;
   /** 更新时间 */
@@ -88,7 +88,7 @@ class ChatService {
    * @param {number} [userId] - 用户 ID
    * @returns {Promise<ChatSession>} 创建成功的会话详情
    */
-  async createSession(agentId: number, title?: string, userId?: number): Promise<ChatSession> {
+  async createSession(agentId: number, title?: string, userId?: string): Promise<ChatSession> {
     const request = {
       title,
       userId,

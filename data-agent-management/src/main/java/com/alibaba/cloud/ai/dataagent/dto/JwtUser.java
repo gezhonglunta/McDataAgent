@@ -23,7 +23,5 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 public class JwtUser {
-	private Long userId;
-	private String mcUserId;
-
+	private String userId;
 }

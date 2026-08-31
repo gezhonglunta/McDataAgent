@@ -41,13 +41,13 @@ public class ChatSession {
 	@Builder.Default
 	private Boolean isPinned = false; // Whether pinned
 
-	private Long userId;
+	private String userId;
 
 	private LocalDateTime createTime;
 
 	private LocalDateTime updateTime;
 
-	public ChatSession(String id, Integer agentId, String title, String status, Long userId) {
+	public ChatSession(String id, Integer agentId, String title, String status, String userId) {
 		this.id = id;
 		this.agentId = agentId;
 		this.title = title;

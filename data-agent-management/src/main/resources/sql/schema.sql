@@ -177,7 +177,7 @@ CREATE TABLE IF NOT EXISTS chat_session (
   title VARCHAR(255) DEFAULT '新对话' COMMENT '会话标题',
   status VARCHAR(50) DEFAULT 'active' COMMENT '状态：active-活跃，archived-归档，deleted-已删除',
   is_pinned TINYINT DEFAULT 0 COMMENT '是否置顶：0-否，1-是',
-  user_id BIGINT COMMENT '用户ID',
+  user_id VARCHAR(255) COMMENT '用户ID',
   create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   update_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   PRIMARY KEY (id),

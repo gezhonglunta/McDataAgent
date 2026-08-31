@@ -33,7 +33,7 @@ export interface ChatSession {
   /** 是否置顶 */
   isPinned: boolean;
   /** 用户 ID */
-  userId?: number;
+  userId?: string;
   /** 创建时间 */
   createTime?: Date;
   /** 更新时间 */
