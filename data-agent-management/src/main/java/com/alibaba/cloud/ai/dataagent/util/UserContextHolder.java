@@ -40,21 +40,21 @@ public class UserContextHolder {
 		});
 	}
 
-	public static String getCurrentUserId() {
+	public static String getCurrentMcUserId() {
 		JwtUser user = THREAD_LOCAL.get();
-		return user != null ? user.getUserId() : null;
+		return user != null ? user.getMcUserId() : null;
 	}
 
 	public static void write(ServerWebExchange exchange, JwtUser user) {
 		exchange.getAttributes().put(USER_ATTRIBUTE_KEY, user);
 	}
 
-	public static String getCurrentUserId(ServerWebExchange exchange) {
+	public static String getCurrentMcUserId(ServerWebExchange exchange) {
 		Object user = exchange.getAttribute(USER_ATTRIBUTE_KEY);
 		if (user instanceof JwtUser jwtUser) {
-			return jwtUser.getUserId();
+			return jwtUser.getMcUserId();
 		}
-		return getCurrentUserId();
+		return getCurrentMcUserId();
 	}
 
 	public static void clear() {

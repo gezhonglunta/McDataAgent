@@ -16,6 +16,8 @@
 package com.alibaba.cloud.ai.dataagent.filter;
 
 import com.alibaba.cloud.ai.dataagent.dto.JwtUser;
+import com.alibaba.cloud.ai.dataagent.entity.McUser;
+import com.alibaba.cloud.ai.dataagent.mapper.McUserMapper;
 import com.alibaba.cloud.ai.dataagent.util.UserContextHolder;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -25,6 +27,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.http.HttpCookie;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseCookie;
@@ -33,6 +36,7 @@ import org.springframework.web.server.ServerWebExchange;
 import org.springframework.web.server.WebFilter;
 import org.springframework.web.server.WebFilterChain;
 import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
@@ -50,6 +54,12 @@ import java.util.Base64;
 public class JwtAuthenticationWebFilter implements WebFilter {
 
 	private final ObjectMapper objectMapper = new ObjectMapper();
+
+	private final McUserMapper mcUserMapper;
+
+	public JwtAuthenticationWebFilter(McUserMapper mcUserMapper) {
+		this.mcUserMapper = mcUserMapper;
+	}
 
 	@Value("${spring.ai.alibaba.data-agent.auth.jwt-claim-name:sub}")
 	String jwtClaimName = "sub";
@@ -102,11 +112,45 @@ public class JwtAuthenticationWebFilter implements WebFilter {
 			return unauthorized(exchange);
 		}
 
-		log.debug("JWT authentication succeeded: path={}, claim={}, userId={}", path, jwtClaimName,
-				maskUserId(user.getUserId()));
-		writeUserContextCookie(exchange, user.getUserId());
-		UserContextHolder.write(exchange, user);
-		return chain.filter(exchange).contextWrite(ctx -> UserContextHolder.write(ctx, user)).doFinally(signal -> UserContextHolder.clear());
+		return Mono.fromCallable(() -> resolveMcUser(user)).subscribeOn(Schedulers.boundedElastic()).flatMap(resolved -> {
+			log.debug("JWT authentication succeeded: path={}, claim={}, mcUserId={}, userId={}", path, jwtClaimName,
+					maskUserId(resolved.getMcUserId()), resolved.getUserId());
+			writeUserContextCookie(exchange, resolved.getMcUserId());
+			UserContextHolder.write(exchange, resolved);
+			return chain.filter(exchange).contextWrite(ctx -> UserContextHolder.write(ctx, resolved))
+					.doFinally(signal -> UserContextHolder.clear());
+		});
+	}
+
+	/**
+	 * Resolve the internal {@code userId} by looking up the {@code mc_user} table using
+	 * the {@code mcUserId} extracted from the JWT. If no matching record exists, a new
+	 * one is created and the generated {@code userId} is returned.
+	 */
+	private JwtUser resolveMcUser(JwtUser user) {
+		if (!org.springframework.util.StringUtils.hasText(user.getMcUserId())) {
+			return user;
+		}
+		try {
+			McUser mcUser = mcUserMapper.selectByMcUserId(user.getMcUserId());
+			if (mcUser == null) {
+				mcUser = McUser.builder().mcUserId(user.getMcUserId()).build();
+				try {
+					mcUserMapper.insert(mcUser);
+				}
+				catch (DuplicateKeyException e) {
+					mcUser = mcUserMapper.selectByMcUserId(user.getMcUserId());
+				}
+			}
+			if (mcUser != null) {
+				user.setUserId(mcUser.getUserId());
+			}
+		}
+		catch (Exception e) {
+			log.warn("Failed to resolve userId from mc_user for mcUserId={}: {}", maskUserId(user.getMcUserId()),
+					e.getMessage());
+		}
+		return user;
 	}
 
 	private Mono<Void> unauthorized(ServerWebExchange exchange) {
@@ -149,7 +193,7 @@ public class JwtAuthenticationWebFilter implements WebFilter {
 
 		JwtUser cookieUser = extractUserFromContextCookie(exchange);
 		if (cookieUser != null) {
-			log.debug("JWT token source: user context cookie, userId={}", maskUserId(cookieUser.getUserId()));
+			log.debug("JWT token source: user context cookie, userId={}", maskUserId(cookieUser.getMcUserId()));
 			return cookieUser;
 		}
 
@@ -204,7 +248,7 @@ public class JwtAuthenticationWebFilter implements WebFilter {
 					exchange.getRequest().getURI().getPath());
 			return null;
 		}
-		return new JwtUser(userId);
+		return new JwtUser(0L, userId);
 	}
 
 	JwtUser parseJwt(String token) {
@@ -227,7 +271,7 @@ public class JwtAuthenticationWebFilter implements WebFilter {
 
 			if (userId != null && !userId.isEmpty()) {
 				log.debug("JWT parse step: claim resolved, claim={}, userId={}", jwtClaimName, maskUserId(userId));
-				return new JwtUser(userId);
+				return new JwtUser(0L, userId);
 			}
 			log.warn("JWT parse step: claim missing or empty, claim={}, {}", jwtClaimName, tokenFingerprint(token));
 		} catch (Exception e) {

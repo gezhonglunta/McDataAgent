@@ -5,5 +5,6 @@ CREATE TABLE IF NOT EXISTS mc_user (
     user_id BIGINT NOT NULL AUTO_INCREMENT COMMENT '用户ID',
     mc_user_id VARCHAR(33) NOT NULL COMMENT 'MC用户ID',
     create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-    PRIMARY KEY (user_id)
+    PRIMARY KEY (user_id),
+    UNIQUE KEY uk_mc_user_id (mc_user_id)
 ) ENGINE = InnoDB COMMENT = '用户表';
