@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-import { $fetch } from 'ofetch';
+import axios from 'axios';
 import type { Datasource } from './datasource';
 
 export interface ApiResponse<T> {
@@ -45,9 +45,8 @@ class AgentDatasourceService {
 	 * @param agentId 智能体ID
 	 */
 	async initSchema(agentId: string): Promise<ApiResponse<null>> {
-		return await $fetch<ApiResponse<null>>(`${BASE_URL_FUNC(agentId)}/init`, {
-			method: 'POST',
-		});
+		const response = await axios.post<ApiResponse<null>>(`${BASE_URL_FUNC(agentId)}/init`);
+		return response.data;
 	}
 
 	/**
@@ -55,9 +54,8 @@ class AgentDatasourceService {
 	 * @param agentId 智能体ID
 	 */
 	async getActiveAgentDatasource(agentId: string): Promise<ApiResponse<AgentDatasource>> {
-		return await $fetch<ApiResponse<AgentDatasource>>(
-			`${BASE_URL_FUNC(agentId)}/active`,
-		);
+		const response = await axios.get<ApiResponse<AgentDatasource>>(`${BASE_URL_FUNC(agentId)}/active`);
+		return response.data;
 	}
 
 	/**
@@ -66,9 +64,10 @@ class AgentDatasourceService {
 	 * @param datasourceId 数据源ID
 	 */
 	async addDatasourceToAgent(agentId: string, datasourceId: number): Promise<ApiResponse<AgentDatasource>> {
-		return await $fetch<ApiResponse<AgentDatasource>>(`${BASE_URL_FUNC(agentId)}/${datasourceId}`, {
-			method: 'POST',
-		});
+		const response = await axios.post<ApiResponse<AgentDatasource>>(
+			`${BASE_URL_FUNC(agentId)}/${datasourceId}`,
+		);
+		return response.data;
 	}
 
 	/**
@@ -77,10 +76,8 @@ class AgentDatasourceService {
 	 * @param dto 更新参数
 	 */
 	async updateDatasourceTables(agentId: string, dto: UpdateDatasourceTablesDto): Promise<ApiResponse<null>> {
-		return await $fetch<ApiResponse<null>>(`${BASE_URL_FUNC(agentId)}/tables`, {
-			method: 'POST',
-			body: dto,
-		});
+		const response = await axios.post<ApiResponse<null>>(`${BASE_URL_FUNC(agentId)}/tables`, dto);
+		return response.data;
 	}
 }
 

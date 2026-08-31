@@ -202,7 +202,7 @@ class GraphService {
       });
       if (latestThreadId) stopParams.append("threadId", latestThreadId);
       const response = await fetch(
-        `${API_BASE_URL}/stream/stop?${stopParams.toString()}`,
+        `${apiBase}${API_BASE_URL}/stream/stop?${stopParams.toString()}`,
         { method: "POST", keepalive: true },
       );
       if (!response.ok) {
