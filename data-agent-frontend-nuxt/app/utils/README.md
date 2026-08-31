@@ -8,6 +8,7 @@
 
 ## 文件
 
+- cookie.ts
 - datasourceSelection.test.ts
 - datasourceSelection.ts
 - report-html-template.test.ts

@@ -86,7 +86,7 @@ spring:
           token-header-name: ${DATA_AGENT_TOKEN_HEADER_NAME:Authorization}
           token-prefix: ${DATA_AGENT_TOKEN_PREFIX:Bearer }
           token-cookie-name: ${DATA_AGENT_TOKEN_COOKIE_NAME:Bearer}
-          token-parameter-name: ${DATA_AGENT_TOKEN_PARAMETER_NAME:}
+          token-parameter-name: ${DATA_AGENT_TOKEN_PARAMETER_NAME:token}
           verify-signature: ${DATA_AGENT_JWT_VERIFY_SIGNATURE:true}
           user-context-cookie-name: ${DATA_AGENT_USER_CONTEXT_COOKIE_NAME:data-agent-user}
           user-context-cookie-secret: ${DATA_AGENT_USER_CONTEXT_COOKIE_SECRET:${DATA_AGENT_JWT_SECRET:}}

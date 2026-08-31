@@ -16,18 +16,23 @@
 package com.alibaba.cloud.ai.dataagent.controller;
 
 import com.alibaba.cloud.ai.dataagent.dto.GraphRequest;
+import com.alibaba.cloud.ai.dataagent.entity.ChatSession;
 import com.alibaba.cloud.ai.dataagent.enums.GraphEventType;
+import com.alibaba.cloud.ai.dataagent.service.chat.ChatSessionService;
 import com.alibaba.cloud.ai.dataagent.service.graph.GraphService;
 import com.alibaba.cloud.ai.dataagent.util.TraceIdMdcUtil;
+import com.alibaba.cloud.ai.dataagent.util.UserContextHolder;
 import com.alibaba.cloud.ai.dataagent.vo.GraphNodeResponse;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.codec.ServerSentEvent;
 import org.springframework.http.server.reactive.ServerHttpResponse;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Sinks;
 
@@ -47,6 +52,8 @@ public class GraphController {
 
 	private final GraphService graphService;
 
+	private final ChatSessionService chatSessionService;
+
 	@GetMapping(value = "/stream/search", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
 	public Flux<ServerSentEvent<GraphNodeResponse>> streamSearch(@RequestParam("agentId") String agentId,
 			@RequestParam(value = "conversationId", required = false) String conversationId,
@@ -54,11 +61,21 @@ public class GraphController {
 			@RequestParam(value = "humanFeedback", required = false) boolean humanFeedback,
 			@RequestParam(value = "humanFeedbackContent", required = false) String humanFeedbackContent,
 			@RequestParam(value = "rejectedPlan", required = false) boolean rejectedPlan,
-			@RequestParam(value = "nl2sqlOnly", required = false) boolean nl2sqlOnly, ServerHttpResponse response) {
+			@RequestParam(value = "nl2sqlOnly", required = false) boolean nl2sqlOnly, ServerHttpResponse response,
+			ServerWebExchange exchange) {
 		// Set SSE-related HTTP headers
 		response.getHeaders().add("Cache-Control", "no-cache");
 		response.getHeaders().add("Connection", "keep-alive");
 		response.getHeaders().add("Access-Control-Allow-Origin", "*");
+
+		String userId = UserContextHolder.getCurrentUserId(exchange);
+		if (StringUtils.hasText(conversationId) && StringUtils.hasText(userId)) {
+			ChatSession session = chatSessionService.findBySessionId(conversationId, userId);
+			if (session == null) {
+				response.setStatusCode(HttpStatus.FORBIDDEN);
+				return Flux.empty();
+			}
+		}
 
 		Sinks.Many<ServerSentEvent<GraphNodeResponse>> sink = Sinks.many().unicast().onBackpressureBuffer();
 

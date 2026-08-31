@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-import { getAuthHeaders } from '~/utils/cookie';
+import { getAuthHeaders, resolveAdminToken } from '~/utils/cookie';
 
 /**
  * @description 图搜索服务，处理与后端的流式 (SSE) 交互，实现搜索过程的实时反馈
@@ -127,6 +127,11 @@ class GraphService {
 
     if (request.humanFeedbackContent) {
       params.append("humanFeedbackContent", request.humanFeedbackContent);
+    }
+
+    const token = resolveAdminToken();
+    if (token) {
+      params.append("token", token);
     }
 
     const {
