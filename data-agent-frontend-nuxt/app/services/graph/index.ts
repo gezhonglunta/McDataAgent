@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+import { getAuthHeaders } from '~/utils/cookie';
+
 /**
  * @description 图搜索服务，处理与后端的流式 (SSE) 交互，实现搜索过程的实时反馈
  */
@@ -203,7 +205,7 @@ class GraphService {
       if (latestThreadId) stopParams.append("threadId", latestThreadId);
       const response = await fetch(
         `${apiBase}${API_BASE_URL}/stream/stop?${stopParams.toString()}`,
-        { method: "POST", keepalive: true },
+        { method: "POST", keepalive: true, headers: getAuthHeaders() },
       );
       if (!response.ok) {
         throw new Error(`Failed to stop graph run: HTTP ${response.status}`);

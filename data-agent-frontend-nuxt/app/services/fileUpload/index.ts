@@ -19,6 +19,7 @@
  */
 
 import { resolveAssetUrl } from '../../composables/useAssetUrl';
+import { getAuthHeaders } from '~/utils/cookie';
 
 /**
  * @description 文件上传响应接口
@@ -52,6 +53,7 @@ export const fileUploadApi = {
 		return fetch(url, {
 			method: 'POST',
 			body: formData,
+			headers: getAuthHeaders(),
 		}).then(async (response) => {
 			if (!response.ok) {
 				const text = await response.text().catch(() => '');

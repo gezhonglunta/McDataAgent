@@ -15,10 +15,19 @@
  */
 
 import axios from 'axios';
+import { resolveAdminToken } from '~/utils/cookie';
 
 export default defineNuxtPlugin(() => {
 	const {
 		public: { apiBase },
 	} = useRuntimeConfig();
 	axios.defaults.baseURL = apiBase;
+
+	axios.interceptors.request.use((config) => {
+		const token = resolveAdminToken();
+		if (token) {
+			config.headers.set('Authorization', `Bearer ${token}`);
+		}
+		return config;
+	});
 });
