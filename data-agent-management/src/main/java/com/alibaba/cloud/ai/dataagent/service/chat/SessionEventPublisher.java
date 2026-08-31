@@ -36,47 +36,53 @@ import java.util.concurrent.atomic.AtomicInteger;
 @Service
 public class SessionEventPublisher {
 
-	private final Map<Integer, AgentSessionSink> sinks = new ConcurrentHashMap<>();
+	private final Map<StreamKey, AgentSessionSink> sinks = new ConcurrentHashMap<>();
 
-	public Flux<ServerSentEvent<SessionUpdateEvent>> register(Integer agentId) {
+	public Flux<ServerSentEvent<SessionUpdateEvent>> register(String userId, Integer agentId) {
 		return Flux.defer(() -> {
-			AgentSessionSink sink = sinks.computeIfAbsent(agentId, id -> new AgentSessionSink());
+			StreamKey key = new StreamKey(userId, agentId);
+			AgentSessionSink sink = sinks.computeIfAbsent(key, k -> new AgentSessionSink());
 			Flux<ServerSentEvent<SessionUpdateEvent>> heartbeat = Flux.interval(Duration.ofSeconds(2))
 				.map(i -> ServerSentEvent.<SessionUpdateEvent>builder().comment("heartbeat").build());
 			sink.increment();
-			log.debug("Registered subscriber for agent {}, current count: {}", agentId, sink.subscribers.get());
+			log.debug("Registered subscriber for stream {}:{}, current count: {}", userId, agentId,
+					sink.subscribers.get());
 			return Flux.merge(heartbeat, sink.sink.asFlux())
-				.doFinally(signalType -> cleanup(agentId, sink, signalType));
+				.doFinally(signalType -> cleanup(key, sink, signalType));
 		});
 	}
 
-	public void publishTitleUpdated(Integer agentId, String sessionId, String title) {
+	public void publishTitleUpdated(String userId, Integer agentId, String sessionId, String title) {
 		if (agentId == null) {
 			return;
 		}
 		SessionUpdateEvent event = SessionUpdateEvent.titleUpdated(sessionId, title);
-		AgentSessionSink sink = sinks.get(agentId);
+		AgentSessionSink sink = sinks.get(new StreamKey(userId, agentId));
 		if (sink == null) {
-			log.debug("No active subscribers for agent {}, skip pushing session title update", agentId);
+			log.debug("No active subscribers for stream {}:{}, skip pushing session title update", userId, agentId);
 			return;
 		}
 		Sinks.EmitResult result = sink.sink.tryEmitNext(ServerSentEvent.builder(event).event(event.getType()).build());
 		if (result.isFailure()) {
-			log.warn("Failed to emit session title update for agent {}, session {}, reason {}", agentId, sessionId,
-					result);
+			log.warn("Failed to emit session title update for stream {}:{}, session {}, reason {}", userId, agentId,
+					sessionId, result);
 		}
 	}
 
-	private void cleanup(Integer agentId, AgentSessionSink sink, SignalType signalType) {
+	private void cleanup(StreamKey key, AgentSessionSink sink, SignalType signalType) {
 		int current = sink.decrement();
-		log.debug("Cleanup called for agent {}, signal: {}, remaining subscribers: {}", agentId, signalType, current);
+		log.debug("Cleanup called for stream {}:{}, signal: {}, remaining subscribers: {}", key.userId(), key.agentId(),
+				signalType, current);
 		if (current <= 0) {
 			// 使用 remove(key, value) 确保只移除当前的 sink 实例，防止并发问题
-			if (sinks.remove(agentId, sink)) {
+			if (sinks.remove(key, sink)) {
 				sink.sink.tryEmitComplete();
-				log.debug("Removed session update sink for agent {}", agentId);
+				log.debug("Removed session update sink for stream {}:{}", key.userId(), key.agentId());
 			}
 		}
+	}
+
+	private record StreamKey(String userId, Integer agentId) {
 	}
 
 	private static class AgentSessionSink {

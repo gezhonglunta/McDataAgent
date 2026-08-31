@@ -4,6 +4,9 @@
 聊天会话服务，处理会话的创建、查询、删除、置顶以及消息的保存与报告下载
 
 ## 类 (Classes)
+### Class: `SessionNotFoundError`
+会话不存在或当前用户无权访问（对应后端 404）
+
 ### Class: `ChatService`
 聊天业务逻辑处理类
 #### 公开方法:

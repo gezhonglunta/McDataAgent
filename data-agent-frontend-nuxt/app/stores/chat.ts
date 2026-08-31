@@ -18,6 +18,7 @@ import { defineStore } from 'pinia';
 import chatService, {
 	type ChatSession,
 	type ChatMessage,
+	SessionNotFoundError,
 } from '~/services/chat/index';
 import graphService, {
 	type GraphRequest,
@@ -258,7 +259,25 @@ export const useChatStore = defineStore('chat', () => {
 		}
 		currentSession.value = session;
 		syncStateToView(session.id, { isStreaming, nodeBlocks });
-		currentMessages.value = await chatService.getSessionMessages(session.id);
+		try {
+			currentMessages.value = await chatService.getSessionMessages(session.id);
+		} catch (e) {
+			if (e instanceof SessionNotFoundError) {
+				sessions.value = sessions.value.filter((s) => s.id !== session.id);
+				const next = sessions.value[0];
+				if (next) {
+					await selectSession(next);
+				} else {
+					currentSession.value = null;
+					currentMessages.value = [];
+					if (currentAgentId.value !== undefined) {
+						await createNewSession(currentAgentId.value);
+					}
+				}
+				return;
+			}
+			throw e;
+		}
 	}
 
 	async function renameSession(session: ExtendedChatSession, newTitle: string) {
@@ -486,8 +505,9 @@ export const useChatStore = defineStore('chat', () => {
 					isStreaming.value = false;
 					isReportStreaming.value = false;
 					streamingReportContent.value = '';
-					currentMessages.value =
-						await chatService.getSessionMessages(sessionId);
+					currentMessages.value = await chatService
+						.getSessionMessages(sessionId)
+						.catch(() => []);
 				}
 			},
 			async () => {
@@ -537,8 +557,9 @@ export const useChatStore = defineStore('chat', () => {
 				await closeStream();
 				sessionState.closeStream = null;
 				if (currentSession.value?.id === sessionId) {
-					currentMessages.value =
-						await chatService.getSessionMessages(sessionId);
+					currentMessages.value = await chatService
+						.getSessionMessages(sessionId)
+						.catch(() => []);
 					nodeBlocks.value = [];
 				}
 				console.log(`会话[${sessionTitle}]处理完成`);
@@ -578,7 +599,9 @@ export const useChatStore = defineStore('chat', () => {
 			nodeBlocks.value = [];
 			isReportStreaming.value = false;
 			streamingReportContent.value = '';
-			currentMessages.value = await chatService.getSessionMessages(sessionId);
+			currentMessages.value = await chatService
+				.getSessionMessages(sessionId)
+				.catch(() => []);
 		}
 	}
 

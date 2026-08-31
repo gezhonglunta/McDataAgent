@@ -25,26 +25,26 @@
 **描述**: 提示词配置实体接口
 ```typescript
 export interface PromptConfig {
-  /** 配置 ID */
-  id?: number;
-  /** 配置名称 */
-  name: string;
-  /** 配置描述 */
-  description?: string;
-  /** 优化提示词内容 */
-  optimizationPrompt: string;
-  /** 优先级 */
-  priority?: number;
-  /** 显示顺序 */
-  displayOrder?: number;
-  /** 是否启用 */
-  enabled?: boolean;
-  /** 提示词类型 */
-  promptType: string;
-  /** 关联的智能体 ID */
-  agentId?: number | null;
-  /** 创建者 */
-  creator?: string;
+	/** 配置 ID */
+	id?: number;
+	/** 配置名称 */
+	name: string;
+	/** 配置描述 */
+	description?: string;
+	/** 优化提示词内容 */
+	optimizationPrompt: string;
+	/** 优先级 */
+	priority?: number;
+	/** 显示顺序 */
+	displayOrder?: number;
+	/** 是否启用 */
+	enabled?: boolean;
+	/** 提示词类型 */
+	promptType: string;
+	/** 关联的智能体 ID */
+	agentId?: number | null;
+	/** 创建者 */
+	creator?: string;
 }
 ```
 
@@ -52,15 +52,15 @@ export interface PromptConfig {
 **描述**: 提示词配置响应结构
 ```typescript
 export interface PromptConfigResponse {
-  /** 是否成功 */
-  success: boolean;
-  /** 提示消息 */
-  message?: string;
-  /** 返回数据 */
-  data?: PromptConfig[] | PromptConfig;
+	/** 是否成功 */
+	success: boolean;
+	/** 提示消息 */
+	message?: string;
+	/** 返回数据 */
+	data?: PromptConfig[] | PromptConfig;
 }
 ```
 
 
 ---
-> 🤖 AI 提示: 逻辑实现请参考 `prompt\index.ts`。
+> 🤖 AI 提示: 逻辑实现请参考 `prompt/index.ts`。

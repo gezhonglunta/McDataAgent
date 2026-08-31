@@ -16,6 +16,7 @@
 package com.alibaba.cloud.ai.dataagent.controller;
 
 import com.alibaba.cloud.ai.dataagent.service.chat.SessionEventPublisher;
+import com.alibaba.cloud.ai.dataagent.util.UserContextHolder;
 import com.alibaba.cloud.ai.dataagent.vo.SessionUpdateEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -24,6 +25,7 @@ import org.springframework.http.codec.ServerSentEvent;
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Flux;
 import org.springframework.http.server.reactive.ServerHttpResponse;
+import org.springframework.web.server.ServerWebExchange;
 
 @Slf4j
 @RestController
@@ -36,13 +38,14 @@ public class SessionEventController {
 
 	@GetMapping(value = "/agent/{agentId}/sessions/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
 	public Flux<ServerSentEvent<SessionUpdateEvent>> streamSessionUpdates(@PathVariable Integer agentId,
-			ServerHttpResponse response) {
+			ServerWebExchange exchange, ServerHttpResponse response) {
 		response.getHeaders().add("Cache-Control", "no-cache");
 		response.getHeaders().add("Connection", "keep-alive");
 		response.getHeaders().add("Access-Control-Allow-Origin", "*");
 
-		log.debug("Client subscribed to session update stream for agent {}", agentId);
-		return sessionEventPublisher.register(agentId)
+		String userId = UserContextHolder.getCurrentUserId(exchange);
+		log.debug("Client subscribed to session update stream for agent {}, user {}", agentId, userId);
+		return sessionEventPublisher.register(userId, agentId)
 			.doFinally(
 					signal -> log.debug("Session update stream finished for agent {} with signal {}", agentId, signal));
 	}

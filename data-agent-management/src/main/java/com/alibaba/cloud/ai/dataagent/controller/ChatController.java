@@ -22,6 +22,7 @@ import com.alibaba.cloud.ai.dataagent.service.chat.ChatMessageService;
 import com.alibaba.cloud.ai.dataagent.service.chat.ChatSessionService;
 import com.alibaba.cloud.ai.dataagent.service.chat.SessionTitleService;
 import com.alibaba.cloud.ai.dataagent.util.ReportTemplateUtil;
+import com.alibaba.cloud.ai.dataagent.util.UserContextHolder;
 import com.alibaba.cloud.ai.dataagent.vo.ApiResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
@@ -33,6 +34,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ServerWebExchange;
 
 import java.util.List;
 import java.util.Map;
@@ -59,8 +61,9 @@ public class ChatController {
 	 * Get session list for an agent
 	 */
 	@GetMapping("/agent/{id}/sessions")
-	public ResponseEntity<List<ChatSession>> getAgentSessions(@PathVariable(value = "id") Integer id) {
-		List<ChatSession> sessions = chatSessionService.findByAgentId(id);
+	public ResponseEntity<List<ChatSession>> getAgentSessions(@PathVariable(value = "id") Integer id,
+			ServerWebExchange exchange) {
+		List<ChatSession> sessions = chatSessionService.findByAgentId(id, currentUserId(exchange));
 		return ResponseEntity.ok(sessions);
 	}
 
@@ -69,24 +72,20 @@ public class ChatController {
 	 */
 	@PostMapping("/agent/{id}/sessions")
 	public ResponseEntity<ChatSession> createSession(@PathVariable(value = "id") Integer id,
-			@RequestBody(required = false) Map<String, Object> request) {
+			@RequestBody(required = false) Map<String, Object> request, ServerWebExchange exchange) {
 		String title = request != null ? (String) request.get("title") : null;
-		String userId = request != null ? toUserId(request.get("userId")) : null;
 
-		ChatSession session = chatSessionService.createSession(id, title, userId);
+		ChatSession session = chatSessionService.createSession(id, title, currentUserId(exchange));
 		return ResponseEntity.ok(session);
-	}
-
-	static String toUserId(Object value) {
-		return value instanceof String number ? number.toString() : null;
 	}
 
 	/**
 	 * Clear all sessions for an agent
 	 */
 	@DeleteMapping("/agent/{id}/sessions")
-	public ResponseEntity<ApiResponse> clearAgentSessions(@PathVariable(value = "id") Integer id) {
-		chatSessionService.clearSessionsByAgentId(id);
+	public ResponseEntity<ApiResponse> clearAgentSessions(@PathVariable(value = "id") Integer id,
+			ServerWebExchange exchange) {
+		chatSessionService.clearSessionsByAgentId(id, currentUserId(exchange));
 		return ResponseEntity.ok(ApiResponse.success("会话已清空"));
 	}
 
@@ -94,7 +93,12 @@ public class ChatController {
 	 * Get message list for a session
 	 */
 	@GetMapping("/sessions/{sessionId}/messages")
-	public ResponseEntity<List<ChatMessage>> getSessionMessages(@PathVariable(value = "sessionId") String sessionId) {
+	public ResponseEntity<List<ChatMessage>> getSessionMessages(@PathVariable(value = "sessionId") String sessionId,
+			ServerWebExchange exchange) {
+		String userId = currentUserId(exchange);
+		if (findSession(sessionId, userId) == null) {
+			return ResponseEntity.notFound().build();
+		}
 		List<ChatMessage> messages = chatMessageService.findBySessionId(sessionId);
 		return ResponseEntity.ok(messages);
 	}
@@ -104,10 +108,14 @@ public class ChatController {
 	 */
 	@PostMapping("/sessions/{sessionId}/messages")
 	public ResponseEntity<ChatMessage> saveMessage(@PathVariable(value = "sessionId") String sessionId,
-			@RequestBody ChatMessageDTO request) {
+			@RequestBody ChatMessageDTO request, ServerWebExchange exchange) {
 		try {
 			if (request == null) {
 				return ResponseEntity.badRequest().build();
+			}
+			String userId = currentUserId(exchange);
+			if (findSession(sessionId, userId) == null) {
+				return ResponseEntity.notFound().build();
 			}
 			ChatMessage message = ChatMessage.builder()
 				.sessionId(sessionId)
@@ -120,10 +128,10 @@ public class ChatController {
 			ChatMessage savedMessage = chatMessageService.saveMessage(message);
 
 			// Update session activity time
-			chatSessionService.updateSessionTime(sessionId);
+			chatSessionService.updateSessionTime(sessionId, userId);
 
 			if (request.isTitleNeeded()) {
-				sessionTitleService.scheduleTitleGeneration(sessionId, message.getContent());
+				sessionTitleService.scheduleTitleGeneration(sessionId, message.getContent(), userId);
 			}
 
 			return ResponseEntity.ok(savedMessage);
@@ -139,9 +147,13 @@ public class ChatController {
 	 */
 	@PutMapping("/sessions/{sessionId}/pin")
 	public ResponseEntity<ApiResponse> pinSession(@PathVariable(value = "sessionId") String sessionId,
-			@RequestParam(value = "isPinned") Boolean isPinned) {
+			@RequestParam(value = "isPinned") Boolean isPinned, ServerWebExchange exchange) {
 		try {
-			chatSessionService.pinSession(sessionId, isPinned);
+			String userId = currentUserId(exchange);
+			if (findSession(sessionId, userId) == null) {
+				return ResponseEntity.notFound().build();
+			}
+			chatSessionService.pinSession(sessionId, userId, isPinned);
 			String message = isPinned ? "会话已置顶" : "会话已取消置顶";
 			return ResponseEntity.ok(ApiResponse.success(message));
 		}
@@ -156,13 +168,16 @@ public class ChatController {
 	 */
 	@PutMapping("/sessions/{sessionId}/rename")
 	public ResponseEntity<ApiResponse> renameSession(@PathVariable(value = "sessionId") String sessionId,
-			@RequestParam(value = "title") String title) {
+			@RequestParam(value = "title") String title, ServerWebExchange exchange) {
 		try {
 			if (!StringUtils.hasText(title)) {
 				return ResponseEntity.badRequest().body(ApiResponse.error("标题不能为空"));
 			}
-
-			chatSessionService.renameSession(sessionId, title.trim());
+			String userId = currentUserId(exchange);
+			if (findSession(sessionId, userId) == null) {
+				return ResponseEntity.notFound().build();
+			}
+			chatSessionService.renameSession(sessionId, userId, title.trim());
 			return ResponseEntity.ok(ApiResponse.success("会话已重命名"));
 		}
 		catch (Exception e) {
@@ -175,15 +190,28 @@ public class ChatController {
 	 * Delete a single session
 	 */
 	@DeleteMapping("/sessions/{sessionId}")
-	public ResponseEntity<ApiResponse> deleteSession(@PathVariable(value = "sessionId") String sessionId) {
+	public ResponseEntity<ApiResponse> deleteSession(@PathVariable(value = "sessionId") String sessionId,
+			ServerWebExchange exchange) {
 		try {
-			chatSessionService.deleteSession(sessionId);
+			String userId = currentUserId(exchange);
+			if (findSession(sessionId, userId) == null) {
+				return ResponseEntity.notFound().build();
+			}
+			chatSessionService.deleteSession(sessionId, userId);
 			return ResponseEntity.ok(ApiResponse.success("会话已删除"));
 		}
 		catch (Exception e) {
 			log.error("Delete session error for session {}: {}", sessionId, e.getMessage(), e);
 			return ResponseEntity.internalServerError().body(ApiResponse.error("删除失败"));
 		}
+	}
+
+	private String currentUserId(ServerWebExchange exchange) {
+		return UserContextHolder.getCurrentUserId(exchange);
+	}
+
+	private ChatSession findSession(String sessionId, String userId) {
+		return chatSessionService.findBySessionId(sessionId, userId);
 	}
 
 	/**

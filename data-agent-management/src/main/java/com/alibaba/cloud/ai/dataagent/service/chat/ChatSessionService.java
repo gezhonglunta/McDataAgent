@@ -27,7 +27,7 @@ public interface ChatSessionService {
 	/**
 	 * Get session list by agent ID
 	 */
-	List<ChatSession> findByAgentId(Integer agentId);
+	List<ChatSession> findByAgentId(Integer agentId, String userId);
 
 	/**
 	 * Create a new session
@@ -37,31 +37,31 @@ public interface ChatSessionService {
 	/**
 	 * Find session by id.
 	 */
-	ChatSession findBySessionId(String sessionId);
+	ChatSession findBySessionId(String sessionId, String userId);
 
 	/**
 	 * Clear all sessions for an agent
 	 */
-	void clearSessionsByAgentId(Integer agentId);
+	void clearSessionsByAgentId(Integer agentId, String userId);
 
 	/**
 	 * Update the last activity time of a session
 	 */
-	void updateSessionTime(String sessionId);
+	void updateSessionTime(String sessionId, String userId);
 
 	/**
 	 * 置顶/取消置顶会话
 	 */
-	void pinSession(String sessionId, boolean isPinned);
+	void pinSession(String sessionId, String userId, boolean isPinned);
 
 	/**
 	 * Rename session
 	 */
-	void renameSession(String sessionId, String newTitle);
+	void renameSession(String sessionId, String userId, String newTitle);
 
 	/**
 	 * Delete a single session
 	 */
-	void deleteSession(String sessionId);
+	void deleteSession(String sessionId, String userId);
 
 }

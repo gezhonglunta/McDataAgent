@@ -28,20 +28,26 @@ public interface ChatSessionMapper {
 	 * Query session list by agent ID
 	 */
 	@Select("""
+			<script>
 			SELECT * FROM chat_session
 			WHERE agent_id = #{agentId} AND status != 'deleted'
+			<if test="userId != null">AND user_id = #{userId}</if>
 			ORDER BY is_pinned DESC, update_time DESC
+			</script>
 			""")
-	List<ChatSession> selectByAgentId(@Param("agentId") Integer agentId);
+	List<ChatSession> selectByAgentId(@Param("agentId") Integer agentId, @Param("userId") String userId);
 
 	/**
 	 * Query session details by session ID
 	 */
 	@Select("""
+			<script>
 			SELECT * FROM chat_session
 			WHERE id = #{sessionId} AND status != 'deleted'
+			<if test="userId != null">AND user_id = #{userId}</if>
+			</script>
 			""")
-	ChatSession selectBySessionId(@Param("sessionId") String sessionId);
+	ChatSession selectBySessionId(@Param("sessionId") String sessionId, @Param("userId") String userId);
 
 	/**
 	 * Update session
@@ -65,55 +71,73 @@ public interface ChatSessionMapper {
 	 * Soft delete all sessions for an agent
 	 */
 	@Update("""
+			<script>
 			UPDATE chat_session
 			SET status = 'deleted', update_time = #{updateTime}
 			WHERE agent_id = #{agentId}
+			<if test="userId != null">AND user_id = #{userId}</if>
+			</script>
 			""")
-	int softDeleteByAgentId(@Param("agentId") Integer agentId, @Param("updateTime") LocalDateTime updateTime);
+	int softDeleteByAgentId(@Param("agentId") Integer agentId, @Param("userId") String userId,
+			@Param("updateTime") LocalDateTime updateTime);
 
 	/**
 	 * Update session time
 	 */
 	@Update("""
+			<script>
 			UPDATE chat_session
 			SET update_time = #{updateTime}
 			WHERE id = #{sessionId}
+			<if test="userId != null">AND user_id = #{userId}</if>
+			</script>
 			""")
-	int updateSessionTime(@Param("sessionId") String sessionId, @Param("updateTime") LocalDateTime updateTime);
+	int updateSessionTime(@Param("sessionId") String sessionId, @Param("userId") String userId,
+			@Param("updateTime") LocalDateTime updateTime);
 
 	/**
 	 * Update session pinned status
 	 */
 	@Update("""
+			<script>
 			UPDATE chat_session SET
 				is_pinned = #{isPinned},
 				update_time = #{updateTime}
 			WHERE id = #{sessionId}
+			<if test="userId != null">AND user_id = #{userId}</if>
+			</script>
 			""")
-	int updatePinStatus(@Param("sessionId") String sessionId, @Param("isPinned") boolean isPinned,
-			@Param("updateTime") LocalDateTime updateTime);
+	int updatePinStatus(@Param("sessionId") String sessionId, @Param("userId") String userId,
+			@Param("isPinned") boolean isPinned, @Param("updateTime") LocalDateTime updateTime);
 
 	/**
 	 * Update session title
 	 */
 	@Update("""
+			<script>
 			UPDATE chat_session SET
 				title = #{title},
 				update_time = #{updateTime}
 			WHERE id = #{sessionId}
+			<if test="userId != null">AND user_id = #{userId}</if>
+			</script>
 			""")
-	int updateTitle(@Param("sessionId") String sessionId, @Param("title") String title,
+	int updateTitle(@Param("sessionId") String sessionId, @Param("userId") String userId, @Param("title") String title,
 			@Param("updateTime") LocalDateTime updateTime);
 
 	/**
 	 * Soft delete session
 	 */
 	@Update("""
+			<script>
 			UPDATE chat_session
 			SET status = 'deleted', update_time = #{updateTime}
 			WHERE id = #{sessionId}
+			<if test="userId != null">AND user_id = #{userId}</if>
+			</script>
 			""")
-	int softDeleteById(@Param("sessionId") String sessionId, @Param("updateTime") LocalDateTime updateTime);
+	int softDeleteById(@Param("sessionId") String sessionId, @Param("userId") String userId,
+			@Param("updateTime") LocalDateTime updateTime);
 
 	@Insert("""
 			INSERT INTO chat_session (id, agent_id, title, status, is_pinned, user_id, create_time, update_time)

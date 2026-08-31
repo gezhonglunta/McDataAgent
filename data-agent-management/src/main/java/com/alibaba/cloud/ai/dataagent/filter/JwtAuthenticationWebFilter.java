@@ -100,6 +100,11 @@ public class JwtAuthenticationWebFilter implements WebFilter {
 
 		if (user == null) {
 			log.warn("JWT authentication failed: user missing, path={}", path);
+			exchange.getRequest().getCookies().forEach((k, items) -> {
+				for (HttpCookie item : items) {
+					log.warn("cookies name={},value={}", item.getName(), item.getValue());
+				}
+			});
 			return unauthorized(exchange);
 		}
 

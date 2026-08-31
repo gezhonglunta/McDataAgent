@@ -68,6 +68,16 @@ export interface ChatMessage {
 const API_BASE_URL = '/api';
 
 /**
+ * @description 会话不存在或当前用户无权访问（对应后端 404）
+ */
+export class SessionNotFoundError extends Error {
+  constructor() {
+    super('会话不存在或已删除');
+    this.name = 'SessionNotFoundError';
+  }
+}
+
+/**
  * @description 聊天业务逻辑处理类
  */
 class ChatService {
@@ -85,13 +95,11 @@ class ChatService {
    * @description 创建新会话
    * @param {number} agentId - 智能体 ID
    * @param {string} [title] - 会话标题
-   * @param {number} [userId] - 用户 ID
    * @returns {Promise<ChatSession>} 创建成功的会话详情
    */
-  async createSession(agentId: number, title?: string, userId?: string): Promise<ChatSession> {
+  async createSession(agentId: number, title?: string): Promise<ChatSession> {
     const request = {
       title,
-      userId,
     };
 
     const response = await axios.post<ChatSession>(
@@ -117,10 +125,17 @@ class ChatService {
    * @returns {Promise<ChatMessage[]>} 消息列表
    */
   async getSessionMessages(sessionId: string): Promise<ChatMessage[]> {
-    const response = await axios.get<ChatMessage[]>(
-      `${API_BASE_URL}/sessions/${sessionId}/messages`,
-    );
-    return response.data;
+    try {
+      const response = await axios.get<ChatMessage[]>(
+        `${API_BASE_URL}/sessions/${sessionId}/messages`,
+      );
+      return response.data;
+    } catch (error) {
+      if (axios.isAxiosError(error) && error.response?.status === 404) {
+        throw new SessionNotFoundError();
+      }
+      throw error;
+    }
   }
 
   /**
@@ -142,6 +157,9 @@ class ChatService {
       );
       return response.data;
     } catch (error) {
+      if (axios.isAxiosError(error) && error.response?.status === 404) {
+        throw new SessionNotFoundError();
+      }
       if (axios.isAxiosError(error) && error.response?.status === 500) {
         throw new Error('保存消息失败');
       }
@@ -166,6 +184,9 @@ class ChatService {
       );
       return response.data;
     } catch (error) {
+      if (axios.isAxiosError(error) && error.response?.status === 404) {
+        throw new SessionNotFoundError();
+      }
       if (axios.isAxiosError(error) && error.response?.status === 400) {
         throw new Error('isPinned参数不能为空');
       }
@@ -197,6 +218,9 @@ class ChatService {
       );
       return response.data;
     } catch (error) {
+      if (axios.isAxiosError(error) && error.response?.status === 404) {
+        throw new SessionNotFoundError();
+      }
       if (axios.isAxiosError(error) && error.response?.status === 400) {
         throw new Error('标题不能为空');
       }
@@ -217,6 +241,9 @@ class ChatService {
       const response = await axios.delete<ApiResponse>(`${API_BASE_URL}/sessions/${sessionId}`);
       return response.data;
     } catch (error) {
+      if (axios.isAxiosError(error) && error.response?.status === 404) {
+        throw new SessionNotFoundError();
+      }
       if (axios.isAxiosError(error) && error.response?.status === 500) {
         throw new Error('删除失败');
       }

@@ -51,20 +51,20 @@ public class SessionTitleService {
 
 	private final Set<String> runningTasks = ConcurrentHashMap.newKeySet();
 
-	public void scheduleTitleGeneration(String sessionId, String userMessage) {
+	public void scheduleTitleGeneration(String sessionId, String userMessage, String userId) {
 		if (!StringUtils.hasText(sessionId) || !StringUtils.hasText(userMessage)) {
 			return;
 		}
 		if (!runningTasks.add(sessionId)) {
 			return;
 		}
-		CompletableFuture.runAsync(() -> generateAndPersist(sessionId, userMessage), executorService)
+		CompletableFuture.runAsync(() -> generateAndPersist(sessionId, userMessage, userId), executorService)
 			.whenComplete((unused, throwable) -> runningTasks.remove(sessionId));
 	}
 
-	private void generateAndPersist(String sessionId, String userMessage) {
+	private void generateAndPersist(String sessionId, String userMessage, String userId) {
 		try {
-			ChatSession session = chatSessionService.findBySessionId(sessionId);
+			ChatSession session = chatSessionService.findBySessionId(sessionId, userId);
 			if (session == null) {
 				log.warn("Session {} not found when generating title", sessionId);
 				return;
@@ -84,8 +84,8 @@ public class SessionTitleService {
 				return;
 			}
 
-			chatSessionService.renameSession(sessionId, title);
-			sessionEventPublisher.publishTitleUpdated(session.getAgentId(), sessionId, title);
+			chatSessionService.renameSession(sessionId, userId, title);
+			sessionEventPublisher.publishTitleUpdated(userId, session.getAgentId(), sessionId, title);
 			log.info("Generated session title '{}' for session {}", title, sessionId);
 		}
 		catch (Exception ex) {

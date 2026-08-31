@@ -9,6 +9,7 @@
 
 ## 文件
 
+- useAssetUrl.ts
 - useEchartsRenderer.ts
 - useTypewriter.ts
 
