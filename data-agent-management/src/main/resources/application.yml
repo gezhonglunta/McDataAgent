@@ -38,8 +38,8 @@ spring:
     alibaba:
       data-agent:
         vector-store:
-          table-topk-limit: 100
-          table-similarity-threshold: 0.2
+          table-topk-limit: 500
+          table-similarity-threshold: 0.1
           default-topk-limit: 8
           batch-del-topk-limit: 10000
           add-batch-size: 100

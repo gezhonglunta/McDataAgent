@@ -82,6 +82,8 @@ public class SchemaServiceImpl implements SchemaService {
 	 */
 	private final AgentVectorStoreService agentVectorStoreService;
 
+	private static final int TABLE_NAME_BATCH_SIZE = 100;
+
 	@Override
 	public void buildSchemaFromDocuments(String agentId, List<Document> currentColumnDocuments,
 			List<Document> tableDocuments, SchemaDTO schemaDTO) {
@@ -242,6 +244,14 @@ public class SchemaServiceImpl implements SchemaService {
 			partitions.add(list.subList(i, Math.min(i + batchSize, list.size())));
 		}
 		return partitions;
+	}
+
+	private List<Document> deduplicateById(List<Document> documents) {
+		Map<String, Document> unique = new LinkedHashMap<>();
+		for (Document document : documents) {
+			unique.putIfAbsent(document.getId(), document);
+		}
+		return new ArrayList<>(unique.values());
 	}
 
 	protected void storeSchemaDocuments(Integer datasourceId, List<Document> columns, List<Document> tables) {
@@ -493,14 +503,18 @@ public class SchemaServiceImpl implements SchemaService {
 		Assert.notNull(datasourceId, "DatasourceId cannot be null.");
 		if (tableNames.isEmpty())
 			return Collections.emptyList();
-		// 通过元数据过滤查找目标表
-		Filter.Expression filterExpression = DynamicFilterService.buildFilterExpressionForSearchTables(datasourceId,
-				tableNames);
-		if (filterExpression == null) {
-			log.error("FilterExpression is null.This should not happen when tableNames is not Empty, ");
-			return Collections.emptyList();
+		// 分批通过元数据过滤查找目标表，避免表名太多导致 IN 条件过大、topK 超限，从而查询失败
+		List<Document> result = new ArrayList<>();
+		for (List<String> batch : partitionList(tableNames, TABLE_NAME_BATCH_SIZE)) {
+			Filter.Expression filterExpression = DynamicFilterService.buildFilterExpressionForSearchTables(datasourceId,
+					batch);
+			if (filterExpression == null) {
+				log.error("FilterExpression is null.This should not happen when tableNames is not Empty, ");
+				continue;
+			}
+			result.addAll(agentVectorStoreService.getDocumentsOnlyByFilter(filterExpression, batch.size() + 5));
 		}
-		return agentVectorStoreService.getDocumentsOnlyByFilter(filterExpression, tableNames.size() + 5);
+		return deduplicateById(result);
 	}
 
 	@Override
@@ -510,16 +524,20 @@ public class SchemaServiceImpl implements SchemaService {
 			log.warn("TableNames is empty.We need talbeNames to search their columns");
 			return Collections.emptyList();
 		}
-		Filter.Expression filterExpression = dynamicFilterService.buildFilterExpressionForSearchColumns(datasourceId,
-				tableNames);
-		if (filterExpression == null) {
-			log.error("FilterExpression is null.This should not happen when tableNames is not Empty, ");
-			return Collections.emptyList();
+		// 分批通过元数据过滤查找目标表下的所有列，避免表名太多导致 IN 条件过大、topK 超限，从而查询失败
+		// 每批 TopK=该批表数量×最大预估列数
+		List<Document> result = new ArrayList<>();
+		for (List<String> batch : partitionList(tableNames, TABLE_NAME_BATCH_SIZE)) {
+			Filter.Expression filterExpression = dynamicFilterService.buildFilterExpressionForSearchColumns(datasourceId,
+					batch);
+			if (filterExpression == null) {
+				log.error("FilterExpression is null.This should not happen when tableNames is not Empty, ");
+				continue;
+			}
+			result.addAll(agentVectorStoreService.getDocumentsOnlyByFilter(filterExpression,
+					batch.size() * dataAgentProperties.getMaxColumnsPerTable()));
 		}
-		// 通过元数据过滤查找目标表下的所有列
-		// TopK=表数量×最大预估列数
-		return agentVectorStoreService.getDocumentsOnlyByFilter(filterExpression,
-				tableNames.size() * dataAgentProperties.getMaxColumnsPerTable());
+		return deduplicateById(result);
 	}
 
 }
