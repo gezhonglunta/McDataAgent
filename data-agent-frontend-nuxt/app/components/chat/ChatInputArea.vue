@@ -20,29 +20,10 @@
 		<div class="status-bar">
 			<div class="status-chips">
 
-				<!-- Datasource selector -->
-				<div class="ds-chip-wrap" @click.stop>
-					<div
-						class="status-chip status-chip--ds"
-						:class="{ disabled: store.isStreaming }"
-						@click="toggleDsMenu"
-					>
-						<v-icon size="13" color="#64748b">mdi-database-outline</v-icon>
-						<span>{{ store.activeDatasource?.name || '选择数据库' }}</span>
-						<v-icon size="13" color="#94a3b8">{{ showDsMenu ? 'mdi-chevron-up' : 'mdi-chevron-down' }}</v-icon>
-					</div>
-					<div v-if="showDsMenu" class="chip-dropdown">
-						<div
-							v-for="ds in store.allDatasources"
-							:key="ds.id"
-							class="chip-dropdown-item"
-							:class="{ active: store.activeDatasource?.id === ds.id }"
-							@click="selectDs(ds)"
-						>
-							<span class="item-name">{{ ds.name }}</span>
-							<span class="item-tag">{{ ds.type?.toUpperCase() }}</span>
-						</div>
-					</div>
+				<!-- Datasource display -->
+				<div class="status-chip status-chip--ds">
+					<v-icon size="13" color="#64748b">mdi-database-outline</v-icon>
+					<span>{{ store.activeDatasource?.name || '选择数据库' }}</span>
 				</div>
 
 				<!-- Model selector -->
@@ -174,24 +155,11 @@ import { useChatStore } from '~/stores/chat';
 const store = useChatStore();
 const inputText = ref('');
 const textareaRef = ref<HTMLTextAreaElement | null>(null);
-const showDsMenu = ref(false);
 const showModelMenu = ref(false);
-
-function toggleDsMenu() {
-	if (store.isStreaming) return;
-	showDsMenu.value = !showDsMenu.value;
-	if (showDsMenu.value) showModelMenu.value = false;
-}
 
 function toggleModelMenu() {
 	if (store.isStreaming || store.chatModels.length === 0) return;
 	showModelMenu.value = !showModelMenu.value;
-	if (showModelMenu.value) showDsMenu.value = false;
-}
-
-async function selectDs(ds: typeof store.allDatasources[0]) {
-	showDsMenu.value = false;
-	await store.switchDatasource(ds);
 }
 
 async function selectModel(m: typeof store.chatModels[0]) {
@@ -239,7 +207,6 @@ async function handleStop() {
 }
 
 function closeMenus() {
-	showDsMenu.value = false;
 	showModelMenu.value = false;
 }
 
