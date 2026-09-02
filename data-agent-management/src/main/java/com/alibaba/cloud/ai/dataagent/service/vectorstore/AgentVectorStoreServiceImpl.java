@@ -265,6 +265,7 @@ public class AgentVectorStoreServiceImpl implements AgentVectorStoreService {
 	@Override
 	public List<Document> getDocumentsForAgent(String agentId, String query, String vectorType, int topK,
 			double threshold) {
+		log.info("智能体文档查询：agentId={},query={},vectorType={},topK={},threshold={}", agentId, query, vectorType, topK, threshold);
 		AgentSearchRequest searchRequest = AgentSearchRequest.builder()
 			.agentId(agentId)
 			.docVectorType(vectorType)
