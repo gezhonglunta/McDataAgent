@@ -66,3 +66,5 @@ spring-ai-alibaba-1.1.0.0/
 .gstack/
 .codegraph/
 /data-agent-management/src/main/resources/static/
+/data-agent-management/src/main/resources/security/
+AcsClientConfiguration.java

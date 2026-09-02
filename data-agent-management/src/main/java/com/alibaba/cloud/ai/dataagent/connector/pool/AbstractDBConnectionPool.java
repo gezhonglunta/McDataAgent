@@ -43,7 +43,7 @@ public abstract class AbstractDBConnectionPool implements DBConnectionPool {
 
 	private static final int QUERY_TIMEOUT_SECONDS = 120;
 
-	private static final int SOCKET_TIMEOUT_SECONDS = 240;
+	private static final int SOCKET_TIMEOUT_SECONDS = 150;
 
 	private record DataSourceCacheKey(String url, String username, String password, String driver) {
 	}
@@ -202,23 +202,24 @@ public abstract class AbstractDBConnectionPool implements DBConnectionPool {
 		props.put(DruidDataSourceFactory.PROP_URL, url);
 		props.put(DruidDataSourceFactory.PROP_USERNAME, username);
 		props.put(DruidDataSourceFactory.PROP_PASSWORD, password);
-		props.put(DruidDataSourceFactory.PROP_INITIALSIZE, "5");
-		props.put(DruidDataSourceFactory.PROP_MINIDLE, "5");
+		props.put(DruidDataSourceFactory.PROP_INITIALSIZE, "10");
+		props.put(DruidDataSourceFactory.PROP_MINIDLE, "10");
 		props.put(DruidDataSourceFactory.PROP_MAXACTIVE, "50");
 		props.put(DruidDataSourceFactory.PROP_MAXWAIT, "5000");
 		props.put(DruidDataSourceFactory.PROP_TIMEBETWEENEVICTIONRUNSMILLIS, "30000");
 		props.put(DruidDataSourceFactory.PROP_FILTERS, filters);
 
 		DruidDataSource dataSource = (DruidDataSource) DruidDataSourceFactory.createDataSource(props);
-		dataSource.setBreakAfterAcquireFailure(Boolean.TRUE);
+		dataSource.setBreakAfterAcquireFailure(Boolean.FALSE);
 		dataSource.setConnectionErrorRetryAttempts(2);
+		dataSource.setTimeBetweenConnectErrorMillis(1000);
 		dataSource.setValidationQueryTimeout(VALIDATION_QUERY_TIMEOUT_SECONDS);
 		dataSource.setQueryTimeout(QUERY_TIMEOUT_SECONDS);
 		dataSource.setConnectionProperties(resolveConnectionProperties(driver, SOCKET_TIMEOUT_SECONDS));
 
 		// 记录数据源创建信息
 		log.info(
-				"Created new DataSource with optimized parameters - InitialSize: 5, MinIdle: 5, MaxActive: 50, MaxWait: 5000ms, ValidationQueryTimeout: 5s, QueryTimeout: 120s, SocketTimeout: 240s");
+				"Created new DataSource with optimized parameters - InitialSize: 5, MinIdle: 5, MaxActive: 50, MaxWait: 5000ms, ValidationQueryTimeout: 5s, QueryTimeout: 120s, SocketTimeout: 150s");
 
 		return dataSource;
 	}
