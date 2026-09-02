@@ -389,6 +389,11 @@
             <artifactId>easyexcel</artifactId>
             <version>3.3.4</version>
         </dependency>
+        <dependency>
+            <groupId>com.more.fw</groupId>
+            <artifactId>mc-inst</artifactId>
+            <version>6.0.3</version>
+        </dependency>
     </dependencies>
     <repositories>
         <repository>
