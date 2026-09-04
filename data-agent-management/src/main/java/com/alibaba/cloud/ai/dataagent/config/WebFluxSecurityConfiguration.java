@@ -58,6 +58,7 @@ public class WebFluxSecurityConfiguration {
 			}));
 
 		return http.csrf(ServerHttpSecurity.CsrfSpec::disable)
+			.headers(headers -> headers.frameOptions(ServerHttpSecurity.HeaderSpec.FrameOptionsSpec::disable))
 			.httpBasic(ServerHttpSecurity.HttpBasicSpec::disable)
 			.formLogin(ServerHttpSecurity.FormLoginSpec::disable)
 			.logout(ServerHttpSecurity.LogoutSpec::disable)
