@@ -20,6 +20,7 @@
 
 import { resolveAssetUrl } from '../../composables/useAssetUrl';
 import { getAuthHeaders } from '~/utils/cookie';
+import { redirectToAdminLogin } from '~/utils/auth';
 
 /**
  * @description 文件上传响应接口
@@ -62,6 +63,10 @@ export const fileUploadApi = {
 			const ct = response.headers.get('content-type') || '';
 			if (ct.includes('application/json')) {
 				const data = await response.json();
+				if (data?.code === '401') {
+					redirectToAdminLogin();
+					throw new Error(data?.msg || '未登录或会话超时');
+				}
 				if (data && data.url) {
 					data.url = resolveAssetUrl(data.url);
 				}

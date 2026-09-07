@@ -16,6 +16,7 @@
 
 import axios from 'axios';
 import { resolveAdminToken } from '~/utils/cookie';
+import { redirectToAdminLogin } from '~/utils/auth';
 
 export default defineNuxtPlugin(() => {
 	const {
@@ -30,4 +31,19 @@ export default defineNuxtPlugin(() => {
 		}
 		return config;
 	});
+
+	axios.interceptors.response.use(
+		(response) => {
+			if (response.data?.code === '401') {
+				redirectToAdminLogin();
+			}
+			return response;
+		},
+		(error) => {
+			if (error.response?.data?.code === '401') {
+				redirectToAdminLogin();
+			}
+			return Promise.reject(error);
+		},
+	);
 });
