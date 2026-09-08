@@ -89,15 +89,9 @@ public class GraphController {
 			.rejectedPlan(rejectedPlan)
 			.nl2sqlOnly(nl2sqlOnly)
 			.build();
-		// graphStreamProcess 内部会规范化会话/运行 ID（同一 request 实例），
-		// 之后以规范化结果作为 traceId（conversationId）/ runId（threadId）
-		TraceIdMdcUtil.put(request.getConversationId(), request.getThreadId());
-		try {
-			graphService.graphStreamProcess(sink, request);
-		}
-		finally {
-			TraceIdMdcUtil.clear();
-		}
+		// traceId 由 TraceIdWebFilter 统一设置（userId），此处不再覆盖
+		String traceId = TraceIdMdcUtil.resolveTraceId(userId);
+		graphService.graphStreamProcess(sink, request);
 
 		return sink.asFlux().filter(sse -> {
 			// 1. 如果 event 是 "complete" 或 "error"，直接放行（不管 text 是否为空）
@@ -113,36 +107,34 @@ public class GraphController {
 			// 判断字符串是否为空
 			return sse.data() != null && sse.data().getText() != null && !sse.data().getText().isEmpty();
 		})
-			.doOnSubscribe(subscription -> TraceIdMdcUtil.runWithMdc(request.getConversationId(), request.getThreadId(),
+			.doOnSubscribe(subscription -> TraceIdMdcUtil.runWithMdc(traceId,
 				() -> log.info("Client subscribed to stream, threadId: {}", request.getThreadId())))
-			.doOnCancel(() -> TraceIdMdcUtil.runWithMdc(request.getConversationId(), request.getThreadId(), () -> {
+			.doOnCancel(() -> TraceIdMdcUtil.runWithMdc(traceId, () -> {
 				log.info("Client disconnected from stream, threadId: {}", request.getThreadId());
 				if (request.getThreadId() != null) {
 					graphService.stopStreamProcessing(request.getThreadId());
 				}
 			}))
-			.doOnError(e -> TraceIdMdcUtil.runWithMdc(request.getConversationId(), request.getThreadId(), () -> {
+			.doOnError(e -> TraceIdMdcUtil.runWithMdc(traceId, () -> {
 				log.error("Error occurred during streaming, threadId: {}: ", request.getThreadId(), e);
 				if (request.getThreadId() != null) {
 					graphService.stopStreamProcessing(request.getThreadId());
 				}
 			}))
-			.doOnComplete(() -> TraceIdMdcUtil.runWithMdc(request.getConversationId(), request.getThreadId(),
+			.doOnComplete(() -> TraceIdMdcUtil.runWithMdc(traceId,
 					() -> log.info("Stream completed successfully, threadId: {}", request.getThreadId())));
 	}
 
 	@PostMapping("/stream/stop")
 	public ResponseEntity<Void> stopStream(@RequestParam("conversationId") String conversationId,
 			@RequestParam(value = "threadId", required = false) String threadId) {
-		return TraceIdMdcUtil.callWithMdc(conversationId, threadId, () -> {
-			if (StringUtils.hasText(threadId)) {
-				graphService.stopStreamProcessing(threadId);
-			}
-			else {
-				graphService.stopStreamProcessingByConversationId(conversationId);
-			}
-			return ResponseEntity.noContent().build();
-		});
+		if (StringUtils.hasText(threadId)) {
+			graphService.stopStreamProcessing(threadId);
+		}
+		else {
+			graphService.stopStreamProcessingByConversationId(conversationId);
+		}
+		return ResponseEntity.noContent().build();
 	}
 
 }

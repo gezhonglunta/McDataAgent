@@ -31,7 +31,10 @@ import com.alibaba.cloud.ai.transformer.splitter.RecursiveCharacterTextSplitter;
 import com.alibaba.cloud.ai.dataagent.splitter.SemanticTextSplitter;
 import com.alibaba.cloud.ai.dataagent.splitter.ParagraphTextSplitter;
 import com.alibaba.cloud.ai.dataagent.util.McpServerToolUtil;
+import com.alibaba.cloud.ai.dataagent.util.MdcPropagatingExecutorService;
 import com.alibaba.cloud.ai.dataagent.util.MdcPropagatingScheduledExecutorService;
+import com.alibaba.cloud.ai.dataagent.util.TraceIdMdcUtil;
+import com.alibaba.cloud.ai.dataagent.util.TraceIdThreadLocalAccessor;
 import com.alibaba.cloud.ai.dataagent.util.NodeBeanUtil;
 import com.alibaba.cloud.ai.dataagent.service.aimodelconfig.AiModelRegistry;
 import com.alibaba.cloud.ai.dataagent.service.aimodelconfig.EmbeddingModelCompatibilityValidator;
@@ -50,6 +53,7 @@ import com.alibaba.cloud.ai.graph.checkpoint.savers.mysql.CreateOption;
 import com.alibaba.cloud.ai.graph.checkpoint.savers.mysql.MysqlSaver;
 import com.alibaba.cloud.ai.graph.exception.GraphStateException;
 import com.knuddels.jtokkit.api.EncodingType;
+import io.micrometer.context.ContextRegistry;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.embedding.BatchingStrategy;
 import org.springframework.ai.embedding.EmbeddingModel;
@@ -446,13 +450,22 @@ public class DataAgentConfiguration implements DisposableBean {
 	}
 
 	/**
-	 * 注册 Reactor Scheduler 装饰器，使所有 Schedulers 创建的调度线程自动传播会话 MDC（traceId/runId），
+	 * 注册 Reactor Scheduler 装饰器，使所有 Schedulers 创建的调度线程自动传播会话 MDC（traceId），
 	 * 保证图中异步节点（AsyncNodeAction / edge_async）日志可串联。必须在任何 Scheduler 创建之前注册。
 	 */
 	@PostConstruct
 	public void registerMdcSchedulerDecorator() {
 		Schedulers.addExecutorServiceDecorator("dataagent-mdc",
 				(scheduler, executorService) -> new MdcPropagatingScheduledExecutorService(executorService));
+	}
+
+	/**
+	 * 将 traceId 注册为 Micrometer Context Propagation 的 ThreadLocal accessor，
+	 * 使 {@link TraceIdMdcUtil#captureSnapshot()} 在跨线程手动传播时能恢复该值。
+	 */
+	@PostConstruct
+	public void registerTraceIdAccessor() {
+		ContextRegistry.getInstance().registerThreadLocalAccessor(new TraceIdThreadLocalAccessor());
 	}
 
 	@Bean(name = "dbOperationExecutor")
@@ -478,10 +491,12 @@ public class DataAgentConfiguration implements DisposableBean {
 		};
 
 		// 创建原生线程池
-		this.dbOperationExecutor = new ThreadPoolExecutor(corePoolSize, corePoolSize, 60L, TimeUnit.SECONDS,
+		ThreadPoolExecutor rawExecutor = new ThreadPoolExecutor(corePoolSize, corePoolSize, 60L, TimeUnit.SECONDS,
 				new LinkedBlockingQueue<>(500), threadFactory, new ThreadPoolExecutor.CallerRunsPolicy());
+		this.dbOperationExecutor = rawExecutor;
 
-		return dbOperationExecutor;
+		// 包装线程池：提交时捕获调用线程的 traceId（ContextSnapshot），执行时恢复并透传
+		return new MdcPropagatingExecutorService(rawExecutor);
 	}
 
 	@Override

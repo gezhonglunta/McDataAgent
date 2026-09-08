@@ -8,7 +8,7 @@
     <!-- 总文件最大大小 -->
     <property scope="local" name="TOTAL_SIZE_CAP" value="5GB" />
     <!-- 日志格式 -->
-    <property name="log.pattern" value="%d %p [%thread] [%X{traceId:-}] [%X{runId:-}] (%file:%line\)- %m%n"/>
+    <property name="log.pattern" value="%d %p [%thread] [%X{traceId:-}] (%file:%line\)- %m%n"/>
     <!-- 通过 run.mode 控制控制台日志输出，值为 ide 时输出到控制台 -->
     <springProperty scope="context" name="RUN_MODE" source="run.mode" defaultValue="" />
 

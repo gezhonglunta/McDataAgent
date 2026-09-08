@@ -81,17 +81,15 @@ public class GraphServiceImpl implements GraphService {
 	@Override
 	public String nl2sql(String naturalQuery, String agentId) throws GraphRunnerException {
 		RunnableConfig config = RunnableConfig.builder().threadId(UUID.randomUUID().toString()).build();
-		return TraceIdMdcUtil.callWithMdc(config.threadId().orElse(null), config.threadId().orElse(null), () -> {
-			try {
-				OverAllState state = compiledGraph
-					.invoke(Map.of(IS_ONLY_NL2SQL, true, INPUT_KEY, naturalQuery, AGENT_ID, agentId), config)
-					.orElseThrow();
-				return state.value(SQL_GENERATE_OUTPUT, "");
-			}
-			finally {
-				releaseCheckpoint(config);
-			}
-		});
+		try {
+			OverAllState state = compiledGraph
+				.invoke(Map.of(IS_ONLY_NL2SQL, true, INPUT_KEY, naturalQuery, AGENT_ID, agentId), config)
+				.orElseThrow();
+			return state.value(SQL_GENERATE_OUTPUT, "");
+		}
+		finally {
+			releaseCheckpoint(config);
+		}
 	}
 
 	@Override
@@ -99,9 +97,6 @@ public class GraphServiceImpl implements GraphService {
 		boolean resuming = StringUtils.hasText(graphRequest.getHumanFeedbackContent());
 		graphRequest.normalizeIds();
 		String threadId = graphRequest.getThreadId();
-		// 以规范化后的 ID 刷新当前线程 MDC，
-		// 使随后提交的订阅任务（subscribeToFlux 的 wrap 捕获）与同步日志均使用准确值
-		TraceIdMdcUtil.put(graphRequest.getConversationId(), threadId);
 		// 创建或获取 StreamContext
 		StreamContext context = streamContextMap.computeIfAbsent(threadId, k -> new StreamContext());
 		context.setConversationId(graphRequest.getConversationId());
@@ -123,10 +118,7 @@ public class GraphServiceImpl implements GraphService {
 		if (!StringUtils.hasText(threadId)) {
 			return;
 		}
-		StreamContext context = streamContextMap.get(threadId);
-		String traceId = context != null && StringUtils.hasText(context.getConversationId())
-				? context.getConversationId() : threadId;
-		TraceIdMdcUtil.runWithMdc(traceId, threadId, () -> stopStreamProcessingInternal(threadId));
+		stopStreamProcessingInternal(threadId);
 	}
 
 	private void stopStreamProcessingInternal(String threadId) {
@@ -252,8 +244,6 @@ public class GraphServiceImpl implements GraphService {
 	private void subscribeToFlux(StreamContext context, Flux<NodeOutput> nodeOutputFlux, GraphRequest graphRequest,
 			String agentId, String threadId) {
 		CompletableFuture.runAsync(TraceIdMdcUtil.wrap(() -> {
-				// normalizeIds 可能在任务提交后完成（如新会话生成 threadId），此处用规范化后的 ID 覆盖 MDC
-				TraceIdMdcUtil.put(graphRequest.getConversationId(), threadId);
 				// 在订阅之前检查上下文是否仍然有效
 				if (context.isCleaned()) {
 					log.debug("StreamContext cleaned before subscription for threadId: {}", threadId);

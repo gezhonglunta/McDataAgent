@@ -16,17 +16,20 @@
 package com.alibaba.cloud.ai.dataagent.util;
 
 import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.Callable;
 import java.util.function.Supplier;
 
+import io.micrometer.context.ContextSnapshot;
+import io.micrometer.context.ContextSnapshot.Scope;
 import org.slf4j.MDC;
 import org.springframework.util.StringUtils;
 
 /**
- * 会话日志追踪 MDC 工具。traceId 使用 conversationId，串联单个会话内的全部日志；
- * runId 使用 threadId，区分会话内每一次图运行。
- *
- * <p>由于 WebFlux 请求与图执行发生在不同线程，跨线程边界时需用 {@link #capture()} /
- * {@link #restore(Map)} 或 {@link #wrap(Runnable)} 手动传播 MDC。
+ * 日志追踪 MDC 工具。traceId 默认取自用户请求（userId），由 {@code TraceIdWebFilter}
+ * 在请求入口统一设置，跨线程边界通过 {@link ContextSnapshot}（{@code captureSnapshot()} /
+ * {@code restoreSnapshot(...)}）、{@code MdcPropagatingScheduledExecutorService} 或
+ * {@link #wrap(Runnable)} 手动传播。
  *
  * @author vlsmb
  * @since 2026/8/26
@@ -35,25 +38,24 @@ public final class TraceIdMdcUtil {
 
 	public static final String TRACE_ID = "traceId";
 
-	public static final String RUN_ID = "runId";
-
 	private TraceIdMdcUtil() {
 	}
 
-	/** 将 traceId（conversationId）与 runId（threadId）放入当前线程 MDC。 */
-	public static void put(String traceId, String runId) {
+	/** 将 traceId 放入当前线程 MDC。 */
+	public static void put(String traceId) {
 		if (StringUtils.hasText(traceId)) {
 			MDC.put(TRACE_ID, traceId);
 		}
-		if (StringUtils.hasText(runId)) {
-			MDC.put(RUN_ID, runId);
-		}
 	}
 
-	/** 移除当前线程 MDC 中的 traceId 与 runId。 */
+	/** 移除当前线程 MDC 中的 traceId。 */
 	public static void clear() {
 		MDC.remove(TRACE_ID);
-		MDC.remove(RUN_ID);
+	}
+
+	/** userId 有值时用作 traceId，否则生成随机 UUID。 */
+	public static String resolveTraceId(String userId) {
+		return StringUtils.hasText(userId) ? userId : UUID.randomUUID().toString();
 	}
 
 	/** 捕获当前线程的完整 MDC 上下文副本，用于跨线程传播。 */
@@ -70,6 +72,19 @@ public final class TraceIdMdcUtil {
 		}
 	}
 
+	/**
+	 * 捕获当前线程已注册 ThreadLocal（traceId accessor）的快照，供跨线程手动传播。
+	 * 需在 {@code TraceIdThreadLocalAccessor} 注册到 {@code ContextRegistry} 后生效。
+	 */
+	public static ContextSnapshot captureSnapshot() {
+		return ContextSnapshot.captureAll();
+	}
+
+	/** 将快照恢复到当前线程，返回的 {@code Scope} 需在使用完毕后调用 {@code close()}。 */
+	public static Scope restoreSnapshot(ContextSnapshot snapshot) {
+		return snapshot.setThreadLocals();
+	}
+
 	/** 包装任务：执行前恢复调用线程的 MDC，结束后清空，避免线程池复用导致串号。 */
 	public static Runnable wrap(Runnable runnable) {
 		Map<String, String> contextMap = capture();
@@ -84,21 +99,35 @@ public final class TraceIdMdcUtil {
 		};
 	}
 
+	/** 包装带返回值的任务：执行前恢复调用线程的 MDC，结束后清空。 */
+	public static <T> Callable<T> wrapCallable(Callable<T> callable) {
+		Map<String, String> contextMap = capture();
+		return () -> {
+			restore(contextMap);
+			try {
+				return callable.call();
+			}
+			finally {
+				MDC.clear();
+			}
+		};
+	}
+
 	/**
-	 * 在指定 traceId/runId 上下文内执行动作，执行完毕后恢复动作之前的 MDC。
+	 * 在指定 traceId 上下文内执行动作，执行完毕后恢复动作之前的 MDC。
 	 * 用于无法改动线程模型的短回调（如 SSE 取消/出错回调等）。
 	 */
-	public static void runWithMdc(String traceId, String runId, Runnable action) {
-		callWithMdc(traceId, runId, () -> {
+	public static void runWithMdc(String traceId, Runnable action) {
+		callWithMdc(traceId, () -> {
 			action.run();
 			return null;
 		});
 	}
 
-	/** 在指定 traceId/runId 上下文内执行并返回结果，结束后恢复之前的 MDC。 */
-	public static <T> T callWithMdc(String traceId, String runId, Supplier<T> action) {
+	/** 在指定 traceId 上下文内执行并返回结果，结束后恢复之前的 MDC。 */
+	public static <T> T callWithMdc(String traceId, Supplier<T> action) {
 		Map<String, String> previous = capture();
-		put(traceId, runId);
+		put(traceId);
 		try {
 			return action.get();
 		}

@@ -19,9 +19,8 @@ import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
@@ -29,63 +28,23 @@ import io.micrometer.context.ContextSnapshot;
 import io.micrometer.context.ContextSnapshot.Scope;
 
 /**
- * 包装 {@link ScheduledExecutorService}，在任务提交时通过 {@link ContextSnapshot} 捕获调用线程的
- * traceId，任务执行时恢复，使 Reactor Scheduler 上的异步节点日志自动携带会话 traceId。
+ * 包装普通 {@link ExecutorService}，任务提交时通过 {@link ContextSnapshot} 捕获调用线程的
+ * traceId，任务执行时恢复并透传，确保独立线程池（如数据库操作线程池）内的日志可被追踪。
  *
  * @author vlsmb
- * @since 2026/8/26
+ * @since 2026/9/8
  */
-public class MdcPropagatingScheduledExecutorService implements ScheduledExecutorService {
+public class MdcPropagatingExecutorService implements ExecutorService {
 
-	private final ScheduledExecutorService delegate;
+	private final ExecutorService delegate;
 
-	public MdcPropagatingScheduledExecutorService(ScheduledExecutorService delegate) {
+	public MdcPropagatingExecutorService(ExecutorService delegate) {
 		this.delegate = delegate;
 	}
 
 	@Override
-	public ScheduledFuture<?> schedule(Runnable command, long delay, TimeUnit unit) {
-		return delegate.schedule(snapshotWrap(command), delay, unit);
-	}
-
-	@Override
-	public <V> ScheduledFuture<V> schedule(Callable<V> callable, long delay, TimeUnit unit) {
-		return delegate.schedule(snapshotWrap(callable), delay, unit);
-	}
-
-	@Override
-	public ScheduledFuture<?> scheduleAtFixedRate(Runnable command, long initialDelay, long period, TimeUnit unit) {
-		return delegate.scheduleAtFixedRate(snapshotWrap(command), initialDelay, period, unit);
-	}
-
-	@Override
-	public ScheduledFuture<?> scheduleWithFixedDelay(Runnable command, long initialDelay, long delay, TimeUnit unit) {
-		return delegate.scheduleWithFixedDelay(snapshotWrap(command), initialDelay, delay, unit);
-	}
-
-	@Override
-	public void shutdown() {
-		delegate.shutdown();
-	}
-
-	@Override
-	public List<Runnable> shutdownNow() {
-		return delegate.shutdownNow();
-	}
-
-	@Override
-	public boolean isShutdown() {
-		return delegate.isShutdown();
-	}
-
-	@Override
-	public boolean isTerminated() {
-		return delegate.isTerminated();
-	}
-
-	@Override
-	public boolean awaitTermination(long timeout, TimeUnit unit) throws InterruptedException {
-		return delegate.awaitTermination(timeout, unit);
+	public void execute(Runnable command) {
+		delegate.execute(snapshotWrap(command));
 	}
 
 	@Override
@@ -126,8 +85,28 @@ public class MdcPropagatingScheduledExecutorService implements ScheduledExecutor
 	}
 
 	@Override
-	public void execute(Runnable command) {
-		delegate.execute(snapshotWrap(command));
+	public void shutdown() {
+		delegate.shutdown();
+	}
+
+	@Override
+	public List<Runnable> shutdownNow() {
+		return delegate.shutdownNow();
+	}
+
+	@Override
+	public boolean isShutdown() {
+		return delegate.isShutdown();
+	}
+
+	@Override
+	public boolean isTerminated() {
+		return delegate.isTerminated();
+	}
+
+	@Override
+	public boolean awaitTermination(long timeout, TimeUnit unit) throws InterruptedException {
+		return delegate.awaitTermination(timeout, unit);
 	}
 
 	private Runnable snapshotWrap(Runnable runnable) {
