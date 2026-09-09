@@ -430,7 +430,9 @@ export const useChatStore = defineStore('chat', () => {
 		const closeStream = await graphService.streamSearch(
 			request,
 			async (response: GraphNodeResponse) => {
-				if (response.error) return;
+				if (response.error) {
+					throw new Error(response.text || '会话处理失败，请稍后重试。');
+				}
 				if (sessionState.lastRequest)
 					sessionState.lastRequest.threadId = response.threadId;
 				if (response.eventType === GraphEventType.FINAL_ANSWER) {

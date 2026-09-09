@@ -54,8 +54,12 @@ public class PlanExecutorDispatcher implements EdgeAction {
 
 			if (repairCount > MAX_REPAIR_ATTEMPTS) {
 				log.error("Plan repair attempts exceeded the limit of {}. Terminating execution.", MAX_REPAIR_ATTEMPTS);
-				// The node is responsible for setting the final error message.
-				return END;
+				String validationError = StateUtil.getObjectValue(state, PLAN_VALIDATION_ERROR, String.class,
+						"计划校验失败，已超过最大修复次数");
+				// Throw so the reactive graph reaches GraphServiceImpl.handleStreamError and
+				// emits an SSE error frame. Returning END would be indistinguishable from success.
+				throw new IllegalStateException("Plan validation failed after " + MAX_REPAIR_ATTEMPTS
+						+ " repair attempts: " + validationError);
 			}
 
 			log.warn("Plan validation failed. Routing back to PlannerNode for repair. Attempt count from state: {}.",
