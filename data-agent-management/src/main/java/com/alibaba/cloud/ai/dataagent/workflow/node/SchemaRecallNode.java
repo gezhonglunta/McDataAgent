@@ -35,7 +35,10 @@ import reactor.core.publisher.Flux;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 import static com.alibaba.cloud.ai.dataagent.constant.Constant.*;
 
@@ -57,6 +60,8 @@ public class SchemaRecallNode implements NodeAction {
 	private final SchemaService schemaService;
 
 	private final AgentDatasourceMapper agentDatasourceMapper;
+
+	private static final List<String> REQUIRED_SYSTEM_TABLES = List.of("sy_dept", "sy_user", "sy_dict", "sy_dict_val", "sy_user_role", "sy_data_auth");
 
 	@Override
 	public Map<String, Object> apply(OverAllState state) throws Exception {
@@ -102,6 +107,8 @@ public class SchemaRecallNode implements NodeAction {
 				schemaService.getTableDocumentsByDatasource(datasourceId, input));
 		// extract table names
 		List<String> recalledTableNames = extractTableName(tableDocuments);
+		// 补充必须的系统表（sy_dept、sy_user），避免相关业务查询因缺少用户/部门表而关联失败
+		supplementRequiredSystemTables(datasourceId, tableDocuments, recalledTableNames);
 		List<Document> columnDocuments = schemaService.getColumnDocumentsByTableName(datasourceId, recalledTableNames);
 
 		String failMessage = """
@@ -148,6 +155,51 @@ public class SchemaRecallNode implements NodeAction {
 		log.info("At this SchemaRecallNode, Recall tables are: {}", tableNames);
 		return tableNames;
 
+	}
+
+	/**
+	 * 检查必须的系统表（sy_dept、sy_user）是否已召回，缺失时从向量库精确补充表文档，
+	 * 并将补充的表名同步到 recallTableNames 中，供后续列文档召回使用。
+	 * @param datasourceId 激活的数据源ID
+	 * @param tableDocuments 已召回的表文档（会被原地追加补充文档）
+	 * @param recalledTableNames 已召回的表名（会被原地追加补充表名）
+	 */
+	private void supplementRequiredSystemTables(Integer datasourceId, List<Document> tableDocuments,
+			List<String> recalledTableNames) {
+		List<String> missingCandidates = new ArrayList<>();
+		for (String requiredTable : REQUIRED_SYSTEM_TABLES) {
+			boolean recalled = recalledTableNames.stream()
+				.anyMatch(name -> requiredTable.equalsIgnoreCase(name));
+			if (!recalled) {
+				// 数据库表名大小写不定，小写/大写候选一并查询，避免精确过滤漏检
+				missingCandidates.add(requiredTable);
+				missingCandidates.add(requiredTable.toUpperCase(Locale.ROOT));
+			}
+		}
+		if (missingCandidates.isEmpty()) {
+			return;
+		}
+
+		List<Document> supplementDocs = schemaService.getTableDocuments(datasourceId, missingCandidates);
+		if (supplementDocs.isEmpty()) {
+			log.warn("Required system tables {} were not found in schema documents of datasource: {}",
+					REQUIRED_SYSTEM_TABLES, datasourceId);
+			return;
+		}
+
+		Set<String> existingDocIds = tableDocuments.stream().map(Document::getId).collect(Collectors.toSet());
+		for (Document doc : supplementDocs) {
+			if (existingDocIds.add(doc.getId())) {
+				tableDocuments.add(doc);
+			}
+			String tableName = (String) doc.getMetadata().get("name");
+			if (tableName != null && !tableName.isEmpty()
+					&& recalledTableNames.stream().noneMatch(name -> tableName.equalsIgnoreCase(name))) {
+				recalledTableNames.add(tableName);
+			}
+		}
+		log.info("Supplemented required system tables for datasource: {}, docs: {}, table names now: {}", datasourceId,
+				supplementDocs.size(), recalledTableNames);
 	}
 
 }
