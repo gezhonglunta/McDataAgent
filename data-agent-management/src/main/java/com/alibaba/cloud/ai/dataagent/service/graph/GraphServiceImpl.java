@@ -23,7 +23,6 @@ import com.alibaba.cloud.ai.dataagent.workflow.node.PlannerNode;
 import com.alibaba.cloud.ai.dataagent.dto.GraphRequest;
 import com.alibaba.cloud.ai.dataagent.service.graph.Context.MultiTurnContextManager;
 import com.alibaba.cloud.ai.dataagent.service.graph.Context.StreamContext;
-import com.alibaba.cloud.ai.dataagent.util.TraceIdMdcUtil;
 import com.alibaba.cloud.ai.dataagent.vo.GraphNodeResponse;
 import com.alibaba.cloud.ai.graph.*;
 import com.alibaba.cloud.ai.graph.checkpoint.BaseCheckpointSaver;
@@ -95,7 +94,21 @@ public class GraphServiceImpl implements GraphService {
 	@Override
 	public void graphStreamProcess(Sinks.Many<ServerSentEvent<GraphNodeResponse>> sink, GraphRequest graphRequest) {
 		boolean resuming = StringUtils.hasText(graphRequest.getHumanFeedbackContent());
-		graphRequest.normalizeIds();
+		if (!resuming) {
+			if (!StringUtils.hasText(graphRequest.getConversationId())) {
+				graphRequest.setConversationId(StringUtils.hasText(graphRequest.getThreadId())
+						? graphRequest.getThreadId() : UUID.randomUUID().toString());
+			}
+			graphRequest.setThreadId(UUID.randomUUID().toString());
+		}
+		else if (!StringUtils.hasText(graphRequest.getThreadId())) {
+			throw new IllegalArgumentException("Graph run ID is required when resuming human feedback");
+		}
+		if (!StringUtils.hasText(graphRequest.getConversationId())) {
+			// Compatibility for existing clients: their old threadId was both the
+			// conversation ID and graph run ID.
+			graphRequest.setConversationId(graphRequest.getThreadId());
+		}
 		String threadId = graphRequest.getThreadId();
 		// 创建或获取 StreamContext
 		StreamContext context = streamContextMap.computeIfAbsent(threadId, k -> new StreamContext());
@@ -118,10 +131,6 @@ public class GraphServiceImpl implements GraphService {
 		if (!StringUtils.hasText(threadId)) {
 			return;
 		}
-		stopStreamProcessingInternal(threadId);
-	}
-
-	private void stopStreamProcessingInternal(String threadId) {
 		log.info("Stopping stream processing for threadId: {}", threadId);
 		StreamContext context = streamContextMap.remove(threadId);
 		multiTurnContextManager.discardPending(context != null ? context.getConversationId() : threadId);
@@ -243,28 +252,28 @@ public class GraphServiceImpl implements GraphService {
 	 */
 	private void subscribeToFlux(StreamContext context, Flux<NodeOutput> nodeOutputFlux, GraphRequest graphRequest,
 			String agentId, String threadId) {
-		CompletableFuture.runAsync(TraceIdMdcUtil.wrap(() -> {
-				// 在订阅之前检查上下文是否仍然有效
+		CompletableFuture.runAsync(() -> {
+			// 在订阅之前检查上下文是否仍然有效
+			if (context.isCleaned()) {
+				log.debug("StreamContext cleaned before subscription for threadId: {}", threadId);
+				return;
+			}
+			Disposable disposable = nodeOutputFlux.subscribe(output -> handleNodeOutput(graphRequest, output),
+					error -> handleStreamError(graphRequest, error), () -> handleStreamComplete(graphRequest));
+			// 原子性地设置 Disposable，如果已经清理则立即释放
+			synchronized (context) {
 				if (context.isCleaned()) {
-					log.debug("StreamContext cleaned before subscription for threadId: {}", threadId);
-					return;
-				}
-				Disposable disposable = nodeOutputFlux.subscribe(output -> handleNodeOutput(graphRequest, output),
-						error -> handleStreamError(graphRequest, error), () -> handleStreamComplete(graphRequest));
-				// 原子性地设置 Disposable，如果已经清理则立即释放
-				synchronized (context) {
-					if (context.isCleaned()) {
-						// 如果已经清理，立即释放刚创建的 Disposable
-						if (disposable != null && !disposable.isDisposed()) {
-							disposable.dispose();
-						}
-					}
-					else {
-						// 只有在未清理的情况下才设置 Disposable
-						context.setDisposable(disposable);
+					// 如果已经清理，立即释放刚创建的 Disposable
+					if (disposable != null && !disposable.isDisposed()) {
+						disposable.dispose();
 					}
 				}
-			}), executor);
+				else {
+					// 只有在未清理的情况下才设置 Disposable
+					context.setDisposable(disposable);
+				}
+			}
+		}, executor);
 	}
 
 	/**

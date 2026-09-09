@@ -20,7 +20,6 @@ import com.alibaba.cloud.ai.dataagent.entity.ChatSession;
 import com.alibaba.cloud.ai.dataagent.enums.GraphEventType;
 import com.alibaba.cloud.ai.dataagent.service.chat.ChatSessionService;
 import com.alibaba.cloud.ai.dataagent.service.graph.GraphService;
-import com.alibaba.cloud.ai.dataagent.util.TraceIdMdcUtil;
 import com.alibaba.cloud.ai.dataagent.util.UserContextHolder;
 import com.alibaba.cloud.ai.dataagent.vo.GraphNodeResponse;
 import lombok.AllArgsConstructor;
@@ -89,8 +88,6 @@ public class GraphController {
 			.rejectedPlan(rejectedPlan)
 			.nl2sqlOnly(nl2sqlOnly)
 			.build();
-		// traceId 由 TraceIdWebFilter 统一设置（userId），此处不再覆盖
-		String traceId = TraceIdMdcUtil.resolveTraceId(userId);
 		graphService.graphStreamProcess(sink, request);
 
 		return sink.asFlux().filter(sse -> {
@@ -107,22 +104,20 @@ public class GraphController {
 			// 判断字符串是否为空
 			return sse.data() != null && sse.data().getText() != null && !sse.data().getText().isEmpty();
 		})
-			.doOnSubscribe(subscription -> TraceIdMdcUtil.runWithMdc(traceId,
-				() -> log.info("Client subscribed to stream, threadId: {}", request.getThreadId())))
-			.doOnCancel(() -> TraceIdMdcUtil.runWithMdc(traceId, () -> {
+			.doOnSubscribe(subscription -> log.info("Client subscribed to stream, threadId: {}", request.getThreadId()))
+			.doOnCancel(() -> {
 				log.info("Client disconnected from stream, threadId: {}", request.getThreadId());
 				if (request.getThreadId() != null) {
 					graphService.stopStreamProcessing(request.getThreadId());
 				}
-			}))
-			.doOnError(e -> TraceIdMdcUtil.runWithMdc(traceId, () -> {
+			})
+			.doOnError(e -> {
 				log.error("Error occurred during streaming, threadId: {}: ", request.getThreadId(), e);
 				if (request.getThreadId() != null) {
 					graphService.stopStreamProcessing(request.getThreadId());
 				}
-			}))
-			.doOnComplete(() -> TraceIdMdcUtil.runWithMdc(traceId,
-					() -> log.info("Stream completed successfully, threadId: {}", request.getThreadId())));
+			})
+			.doOnComplete(() -> log.info("Stream completed successfully, threadId: {}", request.getThreadId()));
 	}
 
 	@PostMapping("/stream/stop")

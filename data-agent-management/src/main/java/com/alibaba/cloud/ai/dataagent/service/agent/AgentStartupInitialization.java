@@ -26,7 +26,6 @@ import com.alibaba.cloud.ai.dataagent.service.business.BusinessKnowledgeService;
 import com.alibaba.cloud.ai.dataagent.service.datasource.AgentDatasourceService;
 import com.alibaba.cloud.ai.dataagent.service.knowledge.AgentKnowledgeService;
 import com.alibaba.cloud.ai.dataagent.service.vectorstore.AgentVectorStoreService;
-import com.alibaba.cloud.ai.dataagent.util.TraceIdMdcUtil;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -68,10 +67,10 @@ public class AgentStartupInitialization implements ApplicationRunner, Disposable
 
 		try {
 			// 因为异步可以让初始化过程在后台运行，不会阻塞Spring启动主线程，提高启动速度和响应性；即使初始化很耗时也不会影响主程序正常启动。
-			CompletableFuture.runAsync(TraceIdMdcUtil.wrap(() -> {
+			CompletableFuture.runAsync(() -> {
 				initializePublishedAgents();
 				recoverPendingEmbeddings();
-			}), executorService).exceptionally(throwable -> {
+			}, executorService).exceptionally(throwable -> {
 				log.error("Error during agent initialization: {}", throwable.getMessage());
 				return null;
 			});

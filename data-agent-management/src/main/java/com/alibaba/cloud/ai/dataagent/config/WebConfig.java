@@ -16,7 +16,7 @@
 package com.alibaba.cloud.ai.dataagent.config;
 
 import com.alibaba.cloud.ai.dataagent.properties.FileStorageProperties;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.AllArgsConstructor;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.CacheControl;
 import org.springframework.web.reactive.config.ResourceHandlerRegistry;
@@ -25,17 +25,20 @@ import org.springframework.web.reactive.config.WebFluxConfigurer;
 import java.nio.file.Paths;
 import java.time.Duration;
 
+/**
+ * Web配置类 (WebFlux 版本)
+ */
 @Configuration
+@AllArgsConstructor
 public class WebConfig implements WebFluxConfigurer {
 
-	@Autowired
-	private FileStorageProperties fileStorageProperties;
+	private final FileStorageProperties fileStorageProperties;
 
 	@Override
 	public void addResourceHandlers(ResourceHandlerRegistry registry) {
 		String uploadDir = Paths.get(fileStorageProperties.getPath()).toAbsolutePath().toString();
-		String uploadPrefix = fileStorageProperties.getUrlPrefix();
-		registry.addResourceHandler(uploadPrefix + "/**")
+
+		registry.addResourceHandler(fileStorageProperties.getUrlPrefix() + "/**")
 			.addResourceLocations("file:" + uploadDir + "/")
 			.setCacheControl(CacheControl.maxAge(Duration.ofHours(1)));
 

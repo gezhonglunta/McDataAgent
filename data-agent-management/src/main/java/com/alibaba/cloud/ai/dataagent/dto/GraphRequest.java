@@ -15,13 +15,10 @@
  */
 package com.alibaba.cloud.ai.dataagent.dto;
 
-import java.util.UUID;
-
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import org.springframework.util.StringUtils;
 
 @Data
 @AllArgsConstructor
@@ -46,32 +43,5 @@ public class GraphRequest {
 	private boolean rejectedPlan;
 
 	private boolean nl2sqlOnly;
-
-	/**
-	 * 规范化 conversationId 与 threadId，保证入口（Controller）与服务层使用同一组 ID：
-	 * <ul>
-	 * <li>新会话：无 conversationId 时用 threadId（兼容旧客户端）或新 UUID 兜底；threadId 每次重新生成。</li>
-	 * <li>恢复人工反馈：threadId 必传，缺失时抛异常。</li>
-	 * <li>无 conversationId：用 threadId 兜底。</li>
-	 * </ul>
-	 * 注意：非恢复场景会覆盖已有 threadId（与原行为一致），因此只允许调用一次。
-	 */
-	public void normalizeIds() {
-		boolean resuming = StringUtils.hasText(humanFeedbackContent);
-		if (!resuming) {
-			if (!StringUtils.hasText(conversationId)) {
-				conversationId = StringUtils.hasText(threadId) ? threadId : UUID.randomUUID().toString();
-			}
-			threadId = UUID.randomUUID().toString();
-		}
-		else if (!StringUtils.hasText(threadId)) {
-			throw new IllegalArgumentException("Graph run ID is required when resuming human feedback");
-		}
-		if (!StringUtils.hasText(conversationId)) {
-			// Compatibility for existing clients: their old threadId was both the
-			// conversation ID and graph run ID.
-			conversationId = threadId;
-		}
-	}
 
 }
