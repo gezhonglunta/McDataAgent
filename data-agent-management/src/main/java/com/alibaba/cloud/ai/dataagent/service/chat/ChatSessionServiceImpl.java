@@ -56,6 +56,9 @@ public class ChatSessionServiceImpl implements ChatSessionService {
 		String sessionId = UUID.randomUUID().toString();
 
 		ChatSession session = new ChatSession(sessionId, agentId, title != null ? title : "新会话", "active", userId);
+		LocalDateTime now = LocalDateTime.now();
+		session.setCreateTime(now);
+		session.setUpdateTime(now);
 		chatSessionMapper.insert(session);
 
 		log.info("Created new chat session: {} for agent: {}", sessionId, agentId);
