@@ -33,7 +33,6 @@ import com.alibaba.cloud.ai.dataagent.splitter.ParagraphTextSplitter;
 import com.alibaba.cloud.ai.dataagent.util.McpServerToolUtil;
 import com.alibaba.cloud.ai.dataagent.util.MdcPropagatingExecutorService;
 import com.alibaba.cloud.ai.dataagent.util.MdcPropagatingScheduledExecutorService;
-import com.alibaba.cloud.ai.dataagent.util.TraceIdMdcUtil;
 import com.alibaba.cloud.ai.dataagent.util.TraceIdThreadLocalAccessor;
 import com.alibaba.cloud.ai.dataagent.util.NodeBeanUtil;
 import com.alibaba.cloud.ai.dataagent.service.aimodelconfig.AiModelRegistry;
@@ -87,6 +86,7 @@ import org.springframework.context.support.GenericApplicationContext;
 import org.springframework.http.client.reactive.ReactorClientHttpConnector;
 import org.springframework.scheduling.annotation.EnableAsync;
 import org.springframework.web.reactive.function.client.WebClient;
+import reactor.core.publisher.Hooks;
 import reactor.core.scheduler.Schedulers;
 import reactor.netty.http.client.HttpClient;
 
@@ -460,12 +460,14 @@ public class DataAgentConfiguration implements DisposableBean {
 	}
 
 	/**
-	 * 将 traceId 注册为 Micrometer Context Propagation 的 ThreadLocal accessor，
-	 * 使 {@link TraceIdMdcUtil#captureSnapshot()} 在跨线程手动传播时能恢复该值。
+	 * 将 traceId 注册为 Micrometer Context Propagation 的 ThreadLocal accessor，并启用 Reactor
+	 * 自动上下文传播，使任意 operator 线程边界（publishOn/subscribeOn/boundedElastic/parallel 等）
+	 * 都能自动恢复 MDC 中的 traceId，覆盖手动包装触及不到的调度路径。
 	 */
 	@PostConstruct
 	public void registerTraceIdAccessor() {
 		ContextRegistry.getInstance().registerThreadLocalAccessor(new TraceIdThreadLocalAccessor());
+		Hooks.enableAutomaticContextPropagation();
 	}
 
 	@Bean(name = "dbOperationExecutor")
