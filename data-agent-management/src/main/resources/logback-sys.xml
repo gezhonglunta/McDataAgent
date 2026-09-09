@@ -39,10 +39,26 @@
             <maxHistory>${MAX_HISTORY}</maxHistory>
         </rollingPolicy>
     </appender>
+    <!-- llm log 按天滚动输出 -->
+    <appender name="llmFile" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>logs/llm.log</file>
+        <append>true</append>
+        <encoder>
+            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} %m%n</pattern>
+            <charset>UTF-8</charset>
+        </encoder>
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <fileNamePattern>logs/llm.%d{yyyy-MM-dd}.log</fileNamePattern>
+            <maxHistory>${MAX_HISTORY}</maxHistory>
+        </rollingPolicy>
+    </appender>
 
     <!-- 日志级别 -->
     <logger name="ACCESS_LOG" level="info" additivity="false">
         <appender-ref ref="accessFile" />
+    </logger>
+    <logger name="LOG_LLM" level="info" additivity="false">
+        <appender-ref ref="llmFile" />
     </logger>
     <logger name="com.alibaba.cloud.ai.dataagent.service" level="info" />
     <logger name="com.alibaba.cloud.ai.dataagent.workflow.node" level="info" />

@@ -20,7 +20,11 @@ import org.aspectj.lang.JoinPoint;
 import org.aspectj.lang.annotation.Aspect;
 import org.aspectj.lang.annotation.Before;
 import org.aspectj.lang.annotation.Pointcut;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
+
+import java.util.UUID;
 
 /**
  * AOP切面类，用于记录LLM调用入参日志
@@ -29,6 +33,7 @@ import org.springframework.stereotype.Component;
 @Component
 @Slf4j
 public class LlmServiceLoggingAspect {
+	private static final Logger loggerLlm = LoggerFactory.getLogger("LOG_LLM");
 
 	@Pointcut("execution(* com.alibaba.cloud.ai.dataagent.service.llm.LlmService.call(..)) "
 			+ "|| execution(* com.alibaba.cloud.ai.dataagent.service.llm.LlmService.callSystem(..)) "
@@ -56,8 +61,9 @@ public class LlmServiceLoggingAspect {
 		} else if ("callUser".equals(methodName)) {
 			user = getArgument(args, 0);
 		}
-
-		log.info("{}.{}:\nsystem prompts:\n{}\nuser prompts:\n{}", className, methodName, system, user);
+		String logId = UUID.randomUUID().toString().replace("-", "");
+		loggerLlm.info("[{}]{}.{}:\nsystem prompts:\n{}\nuser prompts:\n{}", logId, className, methodName, system, user);
+		log.info("[{}]call llm : {}.{}", logId, className, methodName);
 	}
 
 	private String getArgument(Object[] args, int index) {
