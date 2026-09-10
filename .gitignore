@@ -68,3 +68,4 @@ spring-ai-alibaba-1.1.0.0/
 /data-agent-management/src/main/resources/static/
 /data-agent-management/src/main/resources/security/
 AcsClientConfiguration.java
+/data-agent-management/src/main/scripts/start.sh
