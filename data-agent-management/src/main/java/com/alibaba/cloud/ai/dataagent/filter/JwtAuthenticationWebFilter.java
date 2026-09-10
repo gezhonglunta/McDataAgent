@@ -106,7 +106,7 @@ public class JwtAuthenticationWebFilter implements WebFilter {
 		return Mono.fromCallable(() -> user).subscribeOn(Schedulers.boundedElastic()).flatMap(resolved -> {
 			log.debug("JWT authentication succeeded: path={}, claim={}, mcUserId={}", path, jwtClaimName,
 					maskUserId(resolved.getUserId()));
-			writeUserContextCookie(exchange, resolved.getUserId());
+			writeUserContextCookie(exchange, resolved);
 			UserContextHolder.write(exchange, resolved);
 			return chain.filter(exchange).contextWrite(ctx -> UserContextHolder.write(ctx, resolved))
 					.doFinally(signal -> UserContextHolder.clear());
@@ -202,13 +202,13 @@ public class JwtAuthenticationWebFilter implements WebFilter {
 		if (cookie == null || !org.springframework.util.StringUtils.hasText(cookie.getValue())) {
 			return null;
 		}
-		String userId = parseSignedUserContext(cookie.getValue());
-		if (!org.springframework.util.StringUtils.hasText(userId)) {
+		JwtUser user = parseSignedUserContext(cookie.getValue());
+		if (user == null || !org.springframework.util.StringUtils.hasText(user.getUserId())) {
 			log.warn("Invalid user context cookie: name={}, path={}", userContextCookieName,
 					exchange.getRequest().getURI().getPath());
 			return null;
 		}
-		return new JwtUser(userId, null, null);
+		return user;
 	}
 
 	JwtUser parseJwt(String token) {
@@ -242,8 +242,8 @@ public class JwtAuthenticationWebFilter implements WebFilter {
 		return null;
 	}
 
-	void writeUserContextCookie(ServerWebExchange exchange, String userId) {
-		String signedValue = createSignedUserContext(userId);
+	void writeUserContextCookie(ServerWebExchange exchange, JwtUser user) {
+		String signedValue = createSignedUserContext(user);
 		if (!org.springframework.util.StringUtils.hasText(signedValue)) {
 			log.warn("Skip writing user context cookie because secret is unavailable: cookieName={}", userContextCookieName);
 			return;
@@ -257,20 +257,28 @@ public class JwtAuthenticationWebFilter implements WebFilter {
 		exchange.getResponse().addCookie(cookie);
 	}
 
-	String createSignedUserContext(String userId) {
-		if (!org.springframework.util.StringUtils.hasText(userId)) {
+	String createSignedUserContext(JwtUser user) {
+		if (user == null || !org.springframework.util.StringUtils.hasText(user.getUserId())) {
 			return null;
 		}
 		byte[] secret = decodeCookieSecret();
 		if (secret == null) {
 			return null;
 		}
-		String payload = Base64.getUrlEncoder().withoutPadding().encodeToString(userId.getBytes(StandardCharsets.UTF_8));
+		String payload;
+		try {
+			payload = Base64.getUrlEncoder()
+					.withoutPadding()
+					.encodeToString(objectMapper.writeValueAsBytes(user));
+		} catch (Exception ex) {
+			log.warn("Failed to serialize user context cookie payload", ex);
+			return null;
+		}
 		String signature = hmacSha256(payload, secret);
 		return payload + "." + signature;
 	}
 
-	String parseSignedUserContext(String cookieValue) {
+	JwtUser parseSignedUserContext(String cookieValue) {
 		if (!org.springframework.util.StringUtils.hasText(cookieValue)) {
 			return null;
 		}
@@ -288,8 +296,10 @@ public class JwtAuthenticationWebFilter implements WebFilter {
 			return null;
 		}
 		try {
-			return new String(Base64.getUrlDecoder().decode(parts[0]), StandardCharsets.UTF_8);
-		} catch (IllegalArgumentException ex) {
+			byte[] payload = Base64.getUrlDecoder().decode(parts[0]);
+			return objectMapper.readValue(payload, JwtUser.class);
+		} catch (Exception ex) {
+			log.warn("Failed to deserialize user context cookie payload", ex);
 			return null;
 		}
 	}
