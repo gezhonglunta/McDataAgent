@@ -2,11 +2,11 @@
 <!-- scanPeriod：设置监测配置文件是否修改的时间间隔 -->
 <configuration scan="true" scanPeriod="60 seconds">
     <!-- 文件保留天数 -->
-    <property scope="local" name="MAX_HISTORY" value="30" />
+    <property scope="local" name="MAX_HISTORY" value="1" />
     <!-- 单个文件最大大小 -->
-    <property scope="local" name="MAX_FILE_SIZE" value="50MB" />
+    <property scope="local" name="MAX_FILE_SIZE" value="20MB" />
     <!-- 总文件最大大小 -->
-    <property scope="local" name="TOTAL_SIZE_CAP" value="5GB" />
+    <property scope="local" name="TOTAL_SIZE_CAP" value="1GB" />
     <!-- 日志格式 -->
     <property name="log.pattern" value="%d %p [%thread] (%file:%line\)- %m%n"/>
     <!-- 通过 run.mode 控制控制台日志输出，值为 ide 时输出到控制台 -->
