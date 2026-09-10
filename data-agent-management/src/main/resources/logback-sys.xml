@@ -60,8 +60,8 @@
     <logger name="LOG_LLM" level="info" additivity="false">
         <appender-ref ref="llmFile" />
     </logger>
-    <logger name="com.alibaba.cloud.ai.dataagent.service" level="info" />
-    <logger name="com.alibaba.cloud.ai.dataagent.workflow.node" level="info" />
+    <logger name="com.alibaba.cloud.ai.dataagent.service" level="debug" />
+    <logger name="com.alibaba.cloud.ai.dataagent.workflow.node" level="debug" />
     <logger name="com.alibaba.cloud.ai.mapper" level="info" />
     <logger name="org.springframework.jdbc" level="info" />
 

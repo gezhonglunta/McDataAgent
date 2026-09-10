@@ -364,7 +364,7 @@ public class GraphServiceImpl implements GraphService {
 	 * 处理节点输出
 	 */
 	private void handleNodeOutput(GraphRequest request, NodeOutput output) {
-		log.debug("Received output: {}", output.getClass().getSimpleName());
+		//log.debug("Received output: {}", output.getClass().getSimpleName());
 		StreamContext context = streamContextMap.get(request.getThreadId());
 		if (context != null) {
 			output.state()
@@ -388,7 +388,10 @@ public class GraphServiceImpl implements GraphService {
 		}
 		String node = output.node();
 		String chunk = output.chunk();
-		log.debug("Received Stream output: {}", chunk);
+		//log.debug("Received Stream output: {}", chunk);
+		if (chunk != null && !chunk.isEmpty()) {
+			log.debug("Received Stream output: {}", chunk);
+		}
 
 		if (chunk == null || chunk.isEmpty()) {
 			return;
