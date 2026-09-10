@@ -64,7 +64,7 @@
 								session.title || '新会话'
 							}}</span>
 							<span class="session-item-time">{{
-								formatTime(session.createTime || session.updateTime) || '—'
+								formatTime2(session.createTime , session.updateTime) || '—'
 							}}</span>
 						</div>
 						<div class="session-item-actions">
@@ -194,6 +194,16 @@ function formatTime(time: Date | string | undefined): string {
 	if (isThisYear)
 		return `${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 	return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+function formatTime2(time1: Date | string | undefined, time2: Date | string | undefined): string {
+  if (time1 && !time2) {
+    return formatTime(time1);
+  }
+  if (!time1 && time2) {
+    return formatTime(time2);
+  }
+  return formatTime(time1) + '~' + formatTime(time2).replace(/^今天 /, '');
 }
 
 async function handleCreateNewSession() {
