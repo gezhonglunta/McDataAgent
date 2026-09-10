@@ -208,7 +208,7 @@ public class JwtAuthenticationWebFilter implements WebFilter {
 					exchange.getRequest().getURI().getPath());
 			return null;
 		}
-		return new JwtUser(userId);
+		return new JwtUser(userId, null, null);
 	}
 
 	JwtUser parseJwt(String token) {
@@ -228,10 +228,12 @@ public class JwtAuthenticationWebFilter implements WebFilter {
 					payload.getBytes(StandardCharsets.UTF_8).length, jwtClaimName);
 			JsonNode jsonNode = objectMapper.readTree(payload);
 			String userId = jsonNode.path(jwtClaimName).asText(null);
+			String dataAuth = jsonNode.path("dataAuth").asText(null);
+			String deptId = jsonNode.path("deptId").asText(null);
 
 			if (userId != null && !userId.isEmpty()) {
 				log.debug("JWT parse step: claim resolved, claim={}, userId={}", jwtClaimName, maskUserId(userId));
-				return new JwtUser(userId);
+				return new JwtUser(userId, dataAuth, deptId);
 			}
 			log.warn("JWT parse step: claim missing or empty, claim={}, {}", jwtClaimName, tokenFingerprint(token));
 		} catch (Exception e) {

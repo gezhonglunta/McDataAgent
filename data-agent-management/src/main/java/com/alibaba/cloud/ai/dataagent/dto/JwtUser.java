@@ -24,4 +24,6 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class JwtUser {
 	private String userId;
+	private String dataAuth;
+	private String deptId;
 }
