@@ -14,7 +14,6 @@
  * limitations under the License.
  */
 
-import { getAuthHeaders, resolveAdminToken } from '~/utils/cookie';
 import { redirectToAdminLogin } from '~/utils/auth';
 
 /**
@@ -128,11 +127,6 @@ class GraphService {
 
     if (request.humanFeedbackContent) {
       params.append("humanFeedbackContent", request.humanFeedbackContent);
-    }
-
-    const token = resolveAdminToken();
-    if (token) {
-      params.append("token", token);
     }
 
     const {

@@ -36,7 +36,6 @@ import datasourceService, {
 } from '~/services/datasource/index';
 import { resolveActiveDatasource } from '~/utils/datasourceSelection';
 import { applyReportContent } from '~/utils/reportTimeline';
-import { resolveAdminToken } from '~/utils/cookie';
 
 export type Datasource = BaseDatasource & { isActive?: boolean };
 
@@ -123,10 +122,7 @@ export const useChatStore = defineStore('chat', () => {
 		const {
 			public: { apiBase },
 		} = useRuntimeConfig();
-		const token = resolveAdminToken();
-		const streamUrl = `${apiBase}/api/agent/${agentId}/sessions/stream${
-			token ? `?token=${encodeURIComponent(token)}` : ''
-		}`;
+		const streamUrl = `${apiBase}/api/agent/${agentId}/sessions/stream`;
 		const source = new EventSource(streamUrl);
 		source.addEventListener('title-updated', (event) => {
 			try {
