@@ -33,6 +33,7 @@ import org.springframework.ai.openai.OpenAiEmbeddingModel;
 import org.springframework.ai.openai.OpenAiEmbeddingOptions;
 import org.springframework.ai.openai.api.OpenAiApi;
 import org.springframework.ai.retry.RetryUtils;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.client.HttpComponentsClientHttpRequestFactory;
 import org.springframework.http.client.reactive.ReactorClientHttpConnector;
 import org.springframework.stereotype.Service;
@@ -43,11 +44,14 @@ import org.springframework.web.reactive.function.client.WebClient;
 import reactor.netty.http.client.HttpClient;
 import reactor.netty.transport.ProxyProvider;
 
+import java.util.Map;
+
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class DynamicModelFactory {
-
+	@Value("${spring.ai.chat.config.thinking}")
+	private Boolean llmThinking;
 	/**
 	 * 统一使用 OpenAiChatModel，通过 baseUrl 实现多厂商兼容
 	 */
@@ -77,9 +81,25 @@ public class DynamicModelFactory {
 			.temperature(config.getTemperature())
 			.maxTokens(config.getMaxTokens())
 			.streamUsage(true)
+			.extraBody(disableThinkingBody(config.getProvider()))
 			.build();
 		// 4. 返回统一的 OpenAiChatModel
 		return OpenAiChatModel.builder().openAiApi(openAiApi).defaultOptions(openAiChatOptions).build();
+	}
+
+	/**
+	 * 按厂商返回关闭思考模式的请求体顶层字段；OpenAI 官方返回空 Map（不注入，避免 400）。
+	 */
+	private Map<String, Object> disableThinkingBody(String provider) {
+		if (llmThinking) {
+			return Map.of();
+		}
+		String p = provider == null ? "" : provider.toLowerCase();
+		if (p.contains("openai") && !p.contains("azure")) {
+			return Map.of();
+		}
+		log.info("关闭思维模式：provider={}", provider);
+		return Map.of("enable_thinking", false, "thinking", Map.of("type", "disabled"));
 	}
 
 	/**

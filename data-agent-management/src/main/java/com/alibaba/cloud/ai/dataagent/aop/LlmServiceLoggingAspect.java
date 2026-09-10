@@ -41,7 +41,8 @@ public class LlmServiceLoggingAspect {
 	public void llmServiceMethods() {
 	}
 
-	@Pointcut("target(com.alibaba.cloud.ai.dataagent.service.llm.impls.StreamLlmService) ")
+	@Pointcut("target(com.alibaba.cloud.ai.dataagent.service.llm.impls.StreamLlmService) "
+			+ "|| target(com.alibaba.cloud.ai.dataagent.service.llm.impls.BlockLlmService) ")
 	public void llmServiceImpls() {
 	}
 

@@ -388,10 +388,6 @@ public class GraphServiceImpl implements GraphService {
 		}
 		String node = output.node();
 		String chunk = output.chunk();
-		//log.debug("Received Stream output: {}", chunk);
-		if (chunk != null && !chunk.isEmpty()) {
-			log.debug("Received Stream output: {}", chunk);
-		}
 
 		if (chunk == null || chunk.isEmpty()) {
 			return;
@@ -399,6 +395,9 @@ public class GraphServiceImpl implements GraphService {
 
 		// 如果是文本标记符号，则更新文本类型
 		TextType originType = context.getTextType();
+
+		log.debug("Received Stream node:{}, originType: {}, output: {}", node, originType, chunk);
+		
 		TextType textType;
 		boolean isTypeSign = false;
 		if (originType == null) {

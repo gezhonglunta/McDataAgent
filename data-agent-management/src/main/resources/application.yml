@@ -29,6 +29,9 @@ spring:
       encoding: utf-8
   ai:
     chat:
+      config:
+        thinking: false
+        stream: false
       memory:
         repository:
           jdbc:

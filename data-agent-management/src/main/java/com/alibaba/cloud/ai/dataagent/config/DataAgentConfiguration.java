@@ -23,6 +23,7 @@ import com.alibaba.cloud.ai.dataagent.service.file.FileStorageService;
 import com.alibaba.cloud.ai.dataagent.service.file.FileStorageServiceFactory;
 import com.alibaba.cloud.ai.dataagent.service.langfuse.NodeTracingLifecycleListener;
 import com.alibaba.cloud.ai.dataagent.service.llm.LlmService;
+import com.alibaba.cloud.ai.dataagent.service.llm.impls.BlockLlmService;
 import com.alibaba.cloud.ai.dataagent.service.llm.impls.StreamLlmService;
 import com.alibaba.cloud.ai.dataagent.service.vectorstore.SimpleVectorStoreInitialization;
 import com.alibaba.cloud.ai.dataagent.service.vectorstore.MetadataAwareSimpleVectorStore;
@@ -106,7 +107,8 @@ import static com.alibaba.cloud.ai.graph.action.AsyncEdgeAction.edge_async;
 @EnableAsync
 @EnableConfigurationProperties({ CodeExecutorProperties.class, DataAgentProperties.class, FileStorageProperties.class })
 public class DataAgentConfiguration implements DisposableBean {
-
+	@Value("${spring.ai.chat.config.stream}")
+	private Boolean llmStream;
 	/**
 	 * 专用线程池，用于数据库操作的并行处理
 	 */
@@ -115,7 +117,11 @@ public class DataAgentConfiguration implements DisposableBean {
 	@Bean
 	@ConditionalOnMissingBean(LlmService.class)
 	public LlmService llmService(AiModelRegistry aiModelRegistry) {
-		return new StreamLlmService(aiModelRegistry);
+		if (llmStream) {
+			return new StreamLlmService(aiModelRegistry);
+		} else {
+			return new BlockLlmService(aiModelRegistry);
+		}
 	}
 
 	@Bean
