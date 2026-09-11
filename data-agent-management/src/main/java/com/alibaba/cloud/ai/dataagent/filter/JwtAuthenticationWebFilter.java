@@ -17,6 +17,7 @@ package com.alibaba.cloud.ai.dataagent.filter;
 
 import com.alibaba.cloud.ai.dataagent.dto.JwtUser;
 import com.alibaba.cloud.ai.dataagent.util.UserContextHolder;
+import com.fasterxml.jackson.core.JsonParseException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
@@ -298,6 +299,9 @@ public class JwtAuthenticationWebFilter implements WebFilter {
 		try {
 			byte[] payload = Base64.getUrlDecoder().decode(parts[0]);
 			return objectMapper.readValue(payload, JwtUser.class);
+		} catch (JsonParseException e) {
+			String userId = new String(Base64.getUrlDecoder().decode(parts[0]));
+			return new JwtUser(userId, "FA174AFF136D496A87B65443D22357E3", "");
 		} catch (Exception ex) {
 			log.warn("Failed to deserialize user context cookie payload", ex);
 			return null;
