@@ -41,6 +41,8 @@ export interface ChatSession {
   createTime?: Date;
   /** 更新时间 */
   updateTime?: Date;
+  /** 扩展属性（JSON 字符串） */
+  options?: string;
 }
 ```
 

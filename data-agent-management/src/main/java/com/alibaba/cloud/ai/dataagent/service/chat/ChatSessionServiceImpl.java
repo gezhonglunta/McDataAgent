@@ -52,10 +52,11 @@ public class ChatSessionServiceImpl implements ChatSessionService {
 	 * Create a new session
 	 */
 	@Override
-	public ChatSession createSession(Integer agentId, String title, String userId) {
+	public ChatSession createSession(Integer agentId, String title, String userId, String options) {
 		String sessionId = UUID.randomUUID().toString();
 
 		ChatSession session = new ChatSession(sessionId, agentId, title != null ? title : "新会话", "active", userId);
+		session.setOptions(options);
 		LocalDateTime now = LocalDateTime.now();
 		session.setCreateTime(now);
 		session.setUpdateTime(now);

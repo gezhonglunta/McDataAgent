@@ -8,6 +8,7 @@
 
 ## 文件
 
+- auth.ts
 - cookie.ts
 - datasourceSelection.test.ts
 - datasourceSelection.ts

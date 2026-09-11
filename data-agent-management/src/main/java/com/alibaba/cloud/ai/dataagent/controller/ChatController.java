@@ -24,18 +24,27 @@ import com.alibaba.cloud.ai.dataagent.service.chat.SessionTitleService;
 import com.alibaba.cloud.ai.dataagent.util.ReportTemplateUtil;
 import com.alibaba.cloud.ai.dataagent.util.UserContextHolder;
 import com.alibaba.cloud.ai.dataagent.vo.ApiResponse;
-import java.nio.charset.StandardCharsets;
-import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.util.StringUtils;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.CrossOrigin;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ServerWebExchange;
 
+import java.nio.charset.StandardCharsets;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
 
@@ -72,10 +81,10 @@ public class ChatController {
 	 */
 	@PostMapping("/agent/{id}/sessions")
 	public ResponseEntity<ChatSession> createSession(@PathVariable(value = "id") Integer id,
-			@RequestBody(required = false) Map<String, Object> request, ServerWebExchange exchange) {
+													 @RequestBody(required = false) Map<String, Object> request, ServerWebExchange exchange) {
 		String title = request != null ? (String) request.get("title") : null;
-
-		ChatSession session = chatSessionService.createSession(id, title, currentUserId(exchange));
+		String options = request != null ? (String) request.get("options") : null;
+		ChatSession session = chatSessionService.createSession(id, title, currentUserId(exchange), options);
 		return ResponseEntity.ok(session);
 	}
 

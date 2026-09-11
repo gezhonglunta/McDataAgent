@@ -41,6 +41,8 @@ export interface ChatSession {
   createTime?: Date;
   /** 更新时间 */
   updateTime?: Date;
+  /** 扩展属性（JSON 字符串） */
+  options?: string;
 }
 
 /**
@@ -95,11 +97,13 @@ class ChatService {
    * @description 创建新会话
    * @param {number} agentId - 智能体 ID
    * @param {string} [title] - 会话标题
+   * @param {string} [options] - 扩展属性（JSON 字符串）
    * @returns {Promise<ChatSession>} 创建成功的会话详情
    */
-  async createSession(agentId: number, title?: string): Promise<ChatSession> {
+  async createSession(agentId: number, title?: string, options?: string): Promise<ChatSession> {
     const request = {
       title,
+      options,
     };
 
     const response = await axios.post<ChatSession>(

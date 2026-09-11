@@ -1,0 +1,1 @@
+ALTER TABLE chat_session ADD options TEXT NULL COMMENT '扩展属性';

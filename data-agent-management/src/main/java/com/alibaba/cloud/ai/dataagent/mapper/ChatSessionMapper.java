@@ -140,8 +140,8 @@ public interface ChatSessionMapper {
 			@Param("updateTime") LocalDateTime updateTime);
 
 	@Insert("""
-			INSERT INTO chat_session (id, agent_id, title, status, is_pinned, user_id, create_time, update_time)
-			VALUES (#{id}, #{agentId}, #{title}, #{status}, #{isPinned}, #{userId}, #{createTime}, #{updateTime})
+			INSERT INTO chat_session (id, agent_id, title, status, is_pinned, user_id, create_time, update_time, options)
+			VALUES (#{id}, #{agentId}, #{title}, #{status}, #{isPinned}, #{userId}, #{createTime}, #{updateTime}, #{options})
 			""")
 	int insert(ChatSession session);
 

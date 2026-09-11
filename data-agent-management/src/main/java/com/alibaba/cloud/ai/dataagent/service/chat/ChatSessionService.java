@@ -32,7 +32,7 @@ public interface ChatSessionService {
 	/**
 	 * Create a new session
 	 */
-	ChatSession createSession(Integer agentId, String title, String userId);
+	ChatSession createSession(Integer agentId, String title, String userId, String options);
 
 	/**
 	 * Find session by id.

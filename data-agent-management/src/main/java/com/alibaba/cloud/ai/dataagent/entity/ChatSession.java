@@ -47,6 +47,8 @@ public class ChatSession {
 
 	private LocalDateTime updateTime;
 
+	private String options;
+
 	public ChatSession(String id, Integer agentId, String title, String status, String userId) {
 		this.id = id;
 		this.agentId = agentId;

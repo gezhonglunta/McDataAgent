@@ -44,6 +44,15 @@ export interface ExtendedChatSession extends ChatSession {
 	editingTitle?: string;
 }
 
+export interface WisformSessionOptions {
+	mcBaseUrl: string;
+	pageId: string;
+	areaCode: string;
+	funcCode: string;
+	objectName: string;
+	rowPermissionSql: string;
+}
+
 export interface ChatRequestOptions {
 	humanFeedback: boolean;
 	nl2sqlOnly: boolean;
@@ -73,6 +82,9 @@ export const useChatStore = defineStore('chat', () => {
 		showSqlResults: false,
 		pageSize: 20,
 	});
+
+	// ── Wisform (第三方系统) 会话选项 ───────────────────────────────────────────────
+	const sessionOptions = ref<string | undefined>(undefined);
 
 	// ── Report state ────────────────────────────────────────────────────────────
 	const reportFormat = ref<'markdown' | 'html'>('markdown');
@@ -246,8 +258,16 @@ export const useChatStore = defineStore('chat', () => {
 		}
 	}
 
+	function setSessionOptions(options: WisformSessionOptions | undefined) {
+		sessionOptions.value = options ? JSON.stringify(options) : undefined;
+	}
+
 	async function createNewSession(agentId: number) {
-		const newSession = await chatService.createSession(agentId, '新会话');
+		const newSession = await chatService.createSession(
+			agentId,
+			'新会话',
+			sessionOptions.value,
+		);
 		sessions.value.unshift(newSession);
 		await selectSession(newSession);
 		return newSession;
@@ -645,6 +665,7 @@ export const useChatStore = defineStore('chat', () => {
 		reportFormat,
 		showReportFullscreen,
 		fullscreenReportContent,
+		sessionOptions,
 		streamingReportContent,
 		isReportStreaming,
 		currentAgentId,
@@ -662,6 +683,7 @@ export const useChatStore = defineStore('chat', () => {
 		disconnectSessionStream,
 		loadSessions,
 		createNewSession,
+		setSessionOptions,
 		selectSession,
 		renameSession,
 		pinSession,

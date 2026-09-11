@@ -5,9 +5,11 @@
 ## 子目录
 
 - [agent](./agent/README.md)
+- [embed](./embed/README.md)
 - [knowledge](./knowledge/README.md)
 - [prompt-config](./prompt-config/README.md)
 - [system](./system/README.md)
+- [wisform](./wisform/README.md)
 
 ## 文件
 
