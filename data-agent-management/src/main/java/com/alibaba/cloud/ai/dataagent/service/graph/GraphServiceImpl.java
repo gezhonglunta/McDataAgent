@@ -335,10 +335,11 @@ public class GraphServiceImpl implements GraphService {
 			// 清理 listener 侧的 attempt 计数器与仍挂着的节点 span，避免无界增长。
 			nodeTracingLifecycleListener.finishThread(threadId);
 			if (context.getSink() != null && context.getSink().currentSubscriberCount() > 0) {
+				// 只向前端返回统一的友好提示，原始异常详情仅记录在日志与 Langfuse，避免暴露内部信息
 				context.getSink()
 					.tryEmitNext(ServerSentEvent
 						.builder(GraphNodeResponse.error(agentId, threadId,
-								"Error in stream processing: " + error.getMessage()))
+								"处理过程中出现了一点问题，请稍后重试"))
 						.event(STREAM_EVENT_ERROR)
 						.build());
 				context.getSink().tryEmitComplete();

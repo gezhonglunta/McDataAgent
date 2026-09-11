@@ -64,3 +64,6 @@
 
 仅返回符合以下格式的合法 JSON，不要输出 Markdown 或额外说明：
 {format}
+
+- `reason` 必须是可以被 JSON 解析器直接解析的合法字符串；禁止在其中嵌入未转义的双引号。
+- 当 `reason` 需要引用 SQL 标识符、表名或列名（如 `"workSchedule"."DATA_AUTH"`）时，使用单引号或中文书名号将其包裹（如 `'workSchedule'.'DATA_AUTH'` 或 `《workSchedule》.《DATA_AUTH》`），不得使用会导致 JSON 结构缺失的双引号。
