@@ -100,8 +100,7 @@ public class JsonParseUtil {
 			}
 		}
 
-		throw new IllegalArgumentException(
-				String.format("Failed to parse JSON after %d LLM fix attempts", MAX_RETRY_COUNT), lastException);
+		throw new IllegalArgumentException("大语言模型输出异常，请稍后重试或者更换模型再试");
 	}
 
 	/**
