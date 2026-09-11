@@ -61,8 +61,6 @@ public class SchemaRecallNode implements NodeAction {
 
 	private final AgentDatasourceMapper agentDatasourceMapper;
 
-	private static final List<String> REQUIRED_SYSTEM_TABLES = List.of("sy_dept", "sy_user", "sy_dict", "sy_dict_val", "sy_user_role", "sy_data_auth");
-
 	@Override
 	public Map<String, Object> apply(OverAllState state) throws Exception {
 

@@ -15,6 +15,8 @@
  */
 package com.alibaba.cloud.ai.dataagent.constant;
 
+import java.util.List;
+
 /**
  * @author zhangshenghang
  */
@@ -166,5 +168,9 @@ public final class Constant {
 
 	// 第三方系统指定表名（逗号分隔），存在时跳过向量召回，直接精确取表
 	public static final String TABLE_NAMES = "TABLE_NAMES";
+
+	// schema 召回时必须补充的系统表
+	public static final List<String> REQUIRED_SYSTEM_TABLES = List.of("sy_dept", "sy_user", "sy_dict", "sy_dict_val",
+			"sy_user_role", "sy_data_auth");
 
 }

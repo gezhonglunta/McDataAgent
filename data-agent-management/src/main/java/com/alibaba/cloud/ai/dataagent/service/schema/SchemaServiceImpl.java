@@ -121,12 +121,43 @@ public class SchemaServiceImpl implements SchemaService {
 		// Finally assemble SchemaDTO
 		schemaDTO.setTable(tableList);
 
-		Set<String> foreignKeys = tableDocuments.stream()
+		// 仅保留两端表都在当前 schema 表集合内、且来源不是补充系统表的外键，避免外键膨胀出大量无关表
+		Set<String> schemaTableNames = mutableTableDocuments.stream()
+			.map(doc -> (String) doc.getMetadata().get("name"))
+			.filter(StringUtils::isNotBlank)
+			.collect(Collectors.toSet());
+
+		Set<String> foreignKeys = mutableTableDocuments.stream()
+			.filter(doc -> !isRequiredSystemTable((String) doc.getMetadata().get("name")))
 			.map(doc -> (String) doc.getMetadata().getOrDefault("foreignKey", ""))
 			.flatMap(fk -> Arrays.stream(fk.split("、")))
 			.filter(StringUtils::isNotBlank)
+			.filter(fk -> isForeignKeyWithinTables(fk, schemaTableNames))
 			.collect(Collectors.toSet());
 		schemaDTO.setForeignKeys(new ArrayList<>(foreignKeys));
+	}
+
+	private boolean isRequiredSystemTable(String tableName) {
+		if (StringUtils.isBlank(tableName)) {
+			return false;
+		}
+		return Constant.REQUIRED_SYSTEM_TABLES.stream().anyMatch(name -> name.equalsIgnoreCase(tableName));
+	}
+
+	private boolean isForeignKeyWithinTables(String foreignKey, Set<String> tableNames) {
+		String[] parts = foreignKey.split("=");
+		if (parts.length != 2) {
+			return false;
+		}
+		String sourceTable = extractTableName(parts[0]);
+		String targetTable = extractTableName(parts[1]);
+		return sourceTable != null && targetTable != null && tableNames.contains(sourceTable)
+				&& tableNames.contains(targetTable);
+	}
+
+	private String extractTableName(String columnReference) {
+		String[] parts = columnReference.trim().split("\\.");
+		return parts.length >= 2 ? parts[0].trim() : null;
 	}
 
 	@Override
@@ -284,8 +315,8 @@ public class SchemaServiceImpl implements SchemaService {
 			String key = fk.getTable() + "." + fk.getColumn() + "=" + fk.getReferencedTable() + "."
 					+ fk.getReferencedColumn();
 
+			// 只登记到"子表"方向，避免被大量引用的公共/系统表累积其它表的外键
 			map.computeIfAbsent(fk.getTable(), k -> new ArrayList<>()).add(key);
-			map.computeIfAbsent(fk.getReferencedTable(), k -> new ArrayList<>()).add(key);
 		}
 		return map;
 	}

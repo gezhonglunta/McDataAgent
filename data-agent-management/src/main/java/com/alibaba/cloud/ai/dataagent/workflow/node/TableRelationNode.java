@@ -232,10 +232,10 @@ public class TableRelationNode implements NodeAction {
 			List<LogicalRelation> allLogicalRelations = datasourceService.getLogicalRelations(datasourceId);
 			log.info("Found {} logical relations in datasource: {}", allLogicalRelations.size(), datasourceId);
 
-			// 过滤只保留与召回表相关的外键（源表或目标表在召回列表中）
+			// 过滤只保留两端表都在召回列表内的外键（源表与目标表均被召回）
 			List<String> formattedForeignKeys = allLogicalRelations.stream()
 				.filter(lr -> recalledTableNames.contains(lr.getSourceTableName())
-						|| recalledTableNames.contains(lr.getTargetTableName()))
+						&& recalledTableNames.contains(lr.getTargetTableName()))
 				.map(lr -> String.format("%s.%s=%s.%s", lr.getSourceTableName(), lr.getSourceColumnName(),
 						lr.getTargetTableName(), lr.getTargetColumnName()))
 				.distinct()
