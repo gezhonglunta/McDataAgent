@@ -102,11 +102,23 @@ public class SchemaRecallNode implements NodeAction {
 			return Map.of(SCHEMA_RECALL_NODE_OUTPUT, generator);
 		}
 
-		// Execute business logic first - recall schema information immediately
-		List<Document> tableDocuments = new ArrayList<>(
-				schemaService.getTableDocumentsByDatasource(datasourceId, input));
-		// extract table names
-		List<String> recalledTableNames = extractTableName(tableDocuments);
+		// 第三方系统指定表名时，直接精确取表文档，跳过向量相似度召回
+		List<String> specifiedTableNames = StateUtil.getObjectValue(state, TABLE_NAMES, List.class,
+				Collections.emptyList());
+
+		List<Document> tableDocuments;
+		List<String> recalledTableNames;
+		if (!specifiedTableNames.isEmpty()) {
+			tableDocuments = new ArrayList<>(schemaService.getTableDocuments(datasourceId, specifiedTableNames));
+			recalledTableNames = extractTableName(tableDocuments);
+		}
+		else {
+			// Execute business logic first - recall schema information immediately
+			tableDocuments = new ArrayList<>(
+					schemaService.getTableDocumentsByDatasource(datasourceId, input));
+			// extract table names
+			recalledTableNames = extractTableName(tableDocuments);
+		}
 		// 补充必须的系统表（sy_dept、sy_user），避免相关业务查询因缺少用户/部门表而关联失败
 		supplementRequiredSystemTables(datasourceId, tableDocuments, recalledTableNames);
 		List<Document> columnDocuments = schemaService.getColumnDocumentsByTableName(datasourceId, recalledTableNames);

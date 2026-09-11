@@ -215,6 +215,8 @@ public class DataAgentConfiguration implements DisposableBean {
 			keyStrategyHashMap.put(TRACE_THREAD_ID, KeyStrategy.REPLACE);
 			// 第三方系统行权限 SQL
 			keyStrategyHashMap.put(ROW_PERMISSION_SQL, KeyStrategy.REPLACE);
+			// 第三方系统指定表名
+			keyStrategyHashMap.put(TABLE_NAMES, KeyStrategy.REPLACE);
 			// Final result
 			keyStrategyHashMap.put(RESULT, KeyStrategy.REPLACE);
 			keyStrategyHashMap.put(FINAL_ANSWER, KeyStrategy.REPLACE);

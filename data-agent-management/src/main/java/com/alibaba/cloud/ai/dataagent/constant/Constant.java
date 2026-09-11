@@ -164,4 +164,7 @@ public final class Constant {
 	// 第三方系统行权限 SQL，来自会话 options，透传到 SQL 生成节点
 	public static final String ROW_PERMISSION_SQL = "ROW_PERMISSION_SQL";
 
+	// 第三方系统指定表名（逗号分隔），存在时跳过向量召回，直接精确取表
+	public static final String TABLE_NAMES = "TABLE_NAMES";
+
 }

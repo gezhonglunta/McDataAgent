@@ -42,7 +42,9 @@ import reactor.core.Disposable;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Sinks;
 
+import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -196,27 +198,42 @@ public class GraphServiceImpl implements GraphService {
 
 		String multiTurnContext = multiTurnContextManager.buildContext(conversationId);
 		multiTurnContextManager.beginTurn(conversationId, query);
-		String rowPermissionSql = resolveRowPermissionSql(conversationId);
-		Flux<NodeOutput> nodeOutputFlux = compiledGraph.stream(
-				Map.of(IS_ONLY_NL2SQL, nl2sqlOnly, INPUT_KEY, query, AGENT_ID, agentId, HUMAN_REVIEW_ENABLED,
-						humanReviewEnabled, MULTI_TURN_CONTEXT, multiTurnContext, TRACE_THREAD_ID, threadId,
-						ROW_PERMISSION_SQL, rowPermissionSql),
+		String rowPermissionSql = "";
+		List<String> tableNames = List.of();
+		ChatSession session = chatSessionService.findBySessionId(conversationId, null);
+		if (session != null && StringUtils.hasText(session.getOptions())) {
+			try {
+				JsonNode node = JsonUtil.getObjectMapper().readTree(session.getOptions());
+				rowPermissionSql = node.path("rowPermissionSql").asText("");
+				tableNames = parseTableNames(node.path("tableName").asText(""));
+			}
+			catch (Exception e) {
+				log.warn("Failed to resolve session options for conversation {}: {}", conversationId,
+						e.getMessage());
+			}
+		}
+		Map<String, Object> graphInput = new HashMap<>();
+		graphInput.put(IS_ONLY_NL2SQL, nl2sqlOnly);
+		graphInput.put(INPUT_KEY, query);
+		graphInput.put(AGENT_ID, agentId);
+		graphInput.put(HUMAN_REVIEW_ENABLED, humanReviewEnabled);
+		graphInput.put(MULTI_TURN_CONTEXT, multiTurnContext);
+		graphInput.put(TRACE_THREAD_ID, threadId);
+		graphInput.put(ROW_PERMISSION_SQL, rowPermissionSql);
+		graphInput.put(TABLE_NAMES, tableNames);
+		Flux<NodeOutput> nodeOutputFlux = compiledGraph.stream(graphInput,
 				RunnableConfig.builder().threadId(threadId).build());
 		subscribeToFlux(context, nodeOutputFlux, graphRequest, agentId, threadId);
 	}
 
-	private String resolveRowPermissionSql(String conversationId) {
-		try {
-			ChatSession session = chatSessionService.findBySessionId(conversationId, null);
-			if (session != null && StringUtils.hasText(session.getOptions())) {
-				JsonNode node = JsonUtil.getObjectMapper().readTree(session.getOptions());
-				return node.path("rowPermissionSql").asText("");
-			}
+	private List<String> parseTableNames(String tableName) {
+		if (!StringUtils.hasText(tableName)) {
+			return List.of();
 		}
-		catch (Exception e) {
-			log.warn("Failed to resolve rowPermissionSql from session {}: {}", conversationId, e.getMessage());
-		}
-		return "";
+		return Arrays.stream(tableName.split(","))
+			.map(String::trim)
+			.filter(StringUtils::hasText)
+			.toList();
 	}
 
 	private void handleHumanFeedback(GraphRequest graphRequest) {
