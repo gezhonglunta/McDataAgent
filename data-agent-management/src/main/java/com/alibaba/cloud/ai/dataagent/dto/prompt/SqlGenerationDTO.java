@@ -45,4 +45,6 @@ public class SqlGenerationDTO {
 
 	private String rowPermissionSql;
 
+	private String mainTable;
+
 }

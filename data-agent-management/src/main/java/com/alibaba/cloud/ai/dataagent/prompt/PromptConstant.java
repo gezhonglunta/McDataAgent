@@ -96,4 +96,12 @@ public class PromptConstant {
 		return new PromptTemplate(PromptLoader.loadPrompt("data-view-analyze"));
 	}
 
+	public static PromptTemplate getRowPermissionSqlPromptTemplate() {
+		return new PromptTemplate(PromptLoader.loadPrompt("row-permission-sql"));
+	}
+
+	public static PromptTemplate getSqlSecurityDescriptionPromptTemplate() {
+		return new PromptTemplate(PromptLoader.loadPrompt("sql-security-description.txt"));
+	}
+
 }

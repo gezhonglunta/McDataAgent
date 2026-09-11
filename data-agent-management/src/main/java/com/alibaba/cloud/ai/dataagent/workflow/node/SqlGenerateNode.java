@@ -38,7 +38,9 @@ import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Flux;
 
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import static com.alibaba.cloud.ai.dataagent.constant.Constant.DB_DIALECT_TYPE;
@@ -48,6 +50,7 @@ import static com.alibaba.cloud.ai.dataagent.constant.Constant.SQL_GENERATE_COUN
 import static com.alibaba.cloud.ai.dataagent.constant.Constant.SQL_GENERATE_OUTPUT;
 import static com.alibaba.cloud.ai.dataagent.constant.Constant.SQL_REGENERATE_REASON;
 import static com.alibaba.cloud.ai.dataagent.constant.Constant.ROW_PERMISSION_SQL;
+import static com.alibaba.cloud.ai.dataagent.constant.Constant.TABLE_NAMES;
 import static com.alibaba.cloud.ai.dataagent.constant.Constant.TABLE_RELATION_OUTPUT;
 import static com.alibaba.cloud.ai.dataagent.util.PlanProcessUtil.getCurrentExecutionStepInstruction;
 
@@ -169,6 +172,8 @@ public class SqlGenerateNode implements NodeAction {
 		String dialect = StateUtil.getStringValue(state, DB_DIALECT_TYPE);
 		String previousStepResults = buildPreviousStepResults(state);
 		String rowPermissionSql = StateUtil.getStringValue(state, ROW_PERMISSION_SQL, "");
+		List<String> specifiedTableNames = StateUtil.getObjectValue(state, TABLE_NAMES, List.class,
+				Collections.emptyList());
 
 		SqlGenerationDTO sqlGenerationDTO = SqlGenerationDTO.builder()
 			.evidence(evidence)
@@ -180,6 +185,7 @@ public class SqlGenerateNode implements NodeAction {
 			.executionDescription(executionDescription)
 			.dialect(dialect)
 			.rowPermissionSql(rowPermissionSql)
+			.mainTable(specifiedTableNames.isEmpty()?"":specifiedTableNames.get(0))
 			.build();
 
 		return nl2SqlService.generateSql(sqlGenerationDTO);

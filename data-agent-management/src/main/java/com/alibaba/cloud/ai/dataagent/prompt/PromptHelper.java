@@ -130,8 +130,7 @@ public class PromptHelper {
 		params.put("evidence", sqlGenerationDTO.getEvidence());
 		params.put("execution_description", sqlGenerationDTO.getExecutionDescription());
 		params.put("previous_step_results", StringUtils.defaultIfBlank(sqlGenerationDTO.getPreviousStepResults(), "无"));
-		params.put("sql_security_description", "");
-		params.put("row_permission_sql", StringUtils.defaultIfBlank(sqlGenerationDTO.getRowPermissionSql(), ""));
+		buildRowPermissionSql(sqlGenerationDTO, params);
 		return PromptConstant.getNewSqlGeneratorPromptTemplate().render(params);
 	}
 
@@ -186,8 +185,7 @@ public class PromptHelper {
 		params.put("error_message", sqlGenerationDTO.getExceptionMessage());
 		params.put("execution_description", sqlGenerationDTO.getExecutionDescription());
 		params.put("previous_step_results", StringUtils.defaultIfBlank(sqlGenerationDTO.getPreviousStepResults(), "无"));
-		params.put("sql_security_description", "");
-		params.put("row_permission_sql", StringUtils.defaultIfBlank(sqlGenerationDTO.getRowPermissionSql(), ""));
+		buildRowPermissionSql(sqlGenerationDTO, params);
 		return PromptConstant.getSqlErrorFixerPromptTemplate().render(params);
 	}
 
@@ -346,4 +344,16 @@ public class PromptHelper {
 		}
 	}
 
+	private static void buildRowPermissionSql(SqlGenerationDTO sqlGenerationDTO, Map<String, Object> params) {
+		if (StringUtils.isNotBlank(sqlGenerationDTO.getRowPermissionSql())) {
+			Map<String, Object> rowParams = new HashMap<>(1);
+			rowParams.put("main_table", sqlGenerationDTO.getMainTable());
+			rowParams.put("row_permission_sql", sqlGenerationDTO.getRowPermissionSql());
+			params.put("row_permission_sql", PromptConstant.getRowPermissionSqlPromptTemplate().render(rowParams));
+			params.put("sql_security_description", PromptConstant.getSqlSecurityDescriptionPromptTemplate().render());
+		} else {
+			params.put("row_permission_sql", "");
+			params.put("sql_security_description", "");
+		}
+	}
 }
