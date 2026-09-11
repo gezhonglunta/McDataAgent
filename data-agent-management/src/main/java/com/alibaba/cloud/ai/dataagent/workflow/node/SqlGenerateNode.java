@@ -47,6 +47,7 @@ import static com.alibaba.cloud.ai.dataagent.constant.Constant.SQL_EXECUTE_NODE_
 import static com.alibaba.cloud.ai.dataagent.constant.Constant.SQL_GENERATE_COUNT;
 import static com.alibaba.cloud.ai.dataagent.constant.Constant.SQL_GENERATE_OUTPUT;
 import static com.alibaba.cloud.ai.dataagent.constant.Constant.SQL_REGENERATE_REASON;
+import static com.alibaba.cloud.ai.dataagent.constant.Constant.ROW_PERMISSION_SQL;
 import static com.alibaba.cloud.ai.dataagent.constant.Constant.TABLE_RELATION_OUTPUT;
 import static com.alibaba.cloud.ai.dataagent.util.PlanProcessUtil.getCurrentExecutionStepInstruction;
 
@@ -167,6 +168,7 @@ public class SqlGenerateNode implements NodeAction {
 		String userQuery = StateUtil.getCanonicalQuery(state);
 		String dialect = StateUtil.getStringValue(state, DB_DIALECT_TYPE);
 		String previousStepResults = buildPreviousStepResults(state);
+		String rowPermissionSql = StateUtil.getStringValue(state, ROW_PERMISSION_SQL, "");
 
 		SqlGenerationDTO sqlGenerationDTO = SqlGenerationDTO.builder()
 			.evidence(evidence)
@@ -177,6 +179,7 @@ public class SqlGenerateNode implements NodeAction {
 			.exceptionMessage(errorMsg)
 			.executionDescription(executionDescription)
 			.dialect(dialect)
+			.rowPermissionSql(rowPermissionSql)
 			.build();
 
 		return nl2SqlService.generateSql(sqlGenerationDTO);

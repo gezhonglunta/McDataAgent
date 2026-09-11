@@ -55,7 +55,7 @@
 
 {previous_step_results}
 
-{current_login_user}
+{row_permission_sql}
 
 仅当当前步骤明确依赖前序结果时使用这些结果。必须使用结果中真实存在的列和值替换 `?` 等占位符，不得保留示例值或自然语言占位符。
 

@@ -130,8 +130,8 @@ public class PromptHelper {
 		params.put("evidence", sqlGenerationDTO.getEvidence());
 		params.put("execution_description", sqlGenerationDTO.getExecutionDescription());
 		params.put("previous_step_results", StringUtils.defaultIfBlank(sqlGenerationDTO.getPreviousStepResults(), "无"));
-		params.put("current_login_user", "");
 		params.put("sql_security_description", "");
+		params.put("row_permission_sql", StringUtils.defaultIfBlank(sqlGenerationDTO.getRowPermissionSql(), ""));
 		return PromptConstant.getNewSqlGeneratorPromptTemplate().render(params);
 	}
 
@@ -186,9 +186,8 @@ public class PromptHelper {
 		params.put("error_message", sqlGenerationDTO.getExceptionMessage());
 		params.put("execution_description", sqlGenerationDTO.getExecutionDescription());
 		params.put("previous_step_results", StringUtils.defaultIfBlank(sqlGenerationDTO.getPreviousStepResults(), "无"));
-		params.put("current_login_user", "");
 		params.put("sql_security_description", "");
-
+		params.put("row_permission_sql", StringUtils.defaultIfBlank(sqlGenerationDTO.getRowPermissionSql(), ""));
 		return PromptConstant.getSqlErrorFixerPromptTemplate().render(params);
 	}
 

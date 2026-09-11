@@ -36,6 +36,8 @@
 
 {previous_step_results}
 
+{row_permission_sql}
+
 # 修复规则
 
 1. 先定位具体失败原因：语法、字段、函数、方言、类型、日期边界或未替换占位符。

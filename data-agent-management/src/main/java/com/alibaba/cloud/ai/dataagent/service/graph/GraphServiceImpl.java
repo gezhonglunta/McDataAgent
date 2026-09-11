@@ -24,6 +24,10 @@ import com.alibaba.cloud.ai.dataagent.dto.GraphRequest;
 import com.alibaba.cloud.ai.dataagent.service.graph.Context.MultiTurnContextManager;
 import com.alibaba.cloud.ai.dataagent.service.graph.Context.StreamContext;
 import com.alibaba.cloud.ai.dataagent.vo.GraphNodeResponse;
+import com.alibaba.cloud.ai.dataagent.entity.ChatSession;
+import com.alibaba.cloud.ai.dataagent.service.chat.ChatSessionService;
+import com.alibaba.cloud.ai.dataagent.util.JsonUtil;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.alibaba.cloud.ai.graph.*;
 import com.alibaba.cloud.ai.graph.checkpoint.BaseCheckpointSaver;
 import com.alibaba.cloud.ai.graph.exception.GraphRunnerException;
@@ -65,16 +69,19 @@ public class GraphServiceImpl implements GraphService {
 
 	private final NodeTracingLifecycleListener nodeTracingLifecycleListener;
 
+	private final ChatSessionService chatSessionService;
+
 	public GraphServiceImpl(StateGraph stateGraph, CompileConfig compileConfig, BaseCheckpointSaver checkpointSaver,
 			ExecutorService executorService, MultiTurnContextManager multiTurnContextManager,
-			LangfuseService langfuseReporter, NodeTracingLifecycleListener nodeTracingLifecycleListener)
-			throws GraphStateException {
+			LangfuseService langfuseReporter, NodeTracingLifecycleListener nodeTracingLifecycleListener,
+			ChatSessionService chatSessionService) throws GraphStateException {
 		this.compiledGraph = stateGraph.compile(compileConfig);
 		this.checkpointSaver = checkpointSaver;
 		this.executor = executorService;
 		this.multiTurnContextManager = multiTurnContextManager;
 		this.langfuseReporter = langfuseReporter;
 		this.nodeTracingLifecycleListener = nodeTracingLifecycleListener;
+		this.chatSessionService = chatSessionService;
 	}
 
 	@Override
@@ -189,11 +196,27 @@ public class GraphServiceImpl implements GraphService {
 
 		String multiTurnContext = multiTurnContextManager.buildContext(conversationId);
 		multiTurnContextManager.beginTurn(conversationId, query);
+		String rowPermissionSql = resolveRowPermissionSql(conversationId);
 		Flux<NodeOutput> nodeOutputFlux = compiledGraph.stream(
 				Map.of(IS_ONLY_NL2SQL, nl2sqlOnly, INPUT_KEY, query, AGENT_ID, agentId, HUMAN_REVIEW_ENABLED,
-						humanReviewEnabled, MULTI_TURN_CONTEXT, multiTurnContext, TRACE_THREAD_ID, threadId),
+						humanReviewEnabled, MULTI_TURN_CONTEXT, multiTurnContext, TRACE_THREAD_ID, threadId,
+						ROW_PERMISSION_SQL, rowPermissionSql),
 				RunnableConfig.builder().threadId(threadId).build());
 		subscribeToFlux(context, nodeOutputFlux, graphRequest, agentId, threadId);
+	}
+
+	private String resolveRowPermissionSql(String conversationId) {
+		try {
+			ChatSession session = chatSessionService.findBySessionId(conversationId, null);
+			if (session != null && StringUtils.hasText(session.getOptions())) {
+				JsonNode node = JsonUtil.getObjectMapper().readTree(session.getOptions());
+				return node.path("rowPermissionSql").asText("");
+			}
+		}
+		catch (Exception e) {
+			log.warn("Failed to resolve rowPermissionSql from session {}: {}", conversationId, e.getMessage());
+		}
+		return "";
 	}
 
 	private void handleHumanFeedback(GraphRequest graphRequest) {

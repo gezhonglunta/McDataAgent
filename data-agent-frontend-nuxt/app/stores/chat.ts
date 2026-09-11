@@ -49,7 +49,7 @@ export interface WisformSessionOptions {
 	pageId: string;
 	areaCode: string;
 	funcCode: string;
-	objectName: string;
+	tableName: string;
 	rowPermissionSql: string;
 }
 

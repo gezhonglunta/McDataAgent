@@ -43,4 +43,6 @@ public class SqlGenerationDTO {
 
 	private Integer datasourceId;
 
+	private String rowPermissionSql;
+
 }

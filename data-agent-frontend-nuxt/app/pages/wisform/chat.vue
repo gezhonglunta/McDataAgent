@@ -54,7 +54,7 @@ function buildOptions(): WisformSessionOptions {
 		pageId: queryStr('pageId'),
 		areaCode: queryStr('areaCode'),
 		funcCode: queryStr('funcCode'),
-		objectName: queryStr('objectName'),
+		tableName: queryStr('tableName'),
 		rowPermissionSql: queryStr('rowPermissionSql'),
 	};
 }

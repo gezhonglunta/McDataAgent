@@ -161,4 +161,7 @@ public final class Constant {
 	// Langfuse 追踪：threadId 透传到 graph state，用于 token 累计
 	public static final String TRACE_THREAD_ID = "TRACE_THREAD_ID";
 
+	// 第三方系统行权限 SQL，来自会话 options，透传到 SQL 生成节点
+	public static final String ROW_PERMISSION_SQL = "ROW_PERMISSION_SQL";
+
 }
