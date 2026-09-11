@@ -16,12 +16,14 @@
 package com.alibaba.cloud.ai.dataagent.util;
 
 import com.alibaba.cloud.ai.dataagent.dto.JwtUser;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import reactor.core.publisher.Mono;
 import reactor.util.context.Context;
 import org.springframework.web.server.ServerWebExchange;
 
 public class UserContextHolder {
-
+	private static final ObjectMapper objectMapper = new ObjectMapper();
 	private static final String USER_ATTRIBUTE_KEY = JwtUser.class.getName();
 
 	private static final ThreadLocal<JwtUser> THREAD_LOCAL = new ThreadLocal<>();
@@ -43,6 +45,26 @@ public class UserContextHolder {
 	public static String getCurrentUserId() {
 		JwtUser user = THREAD_LOCAL.get();
 		return user != null ? user.getUserId() : null;
+	}
+
+	public static String getCurrentUserText() {
+		JwtUser user = THREAD_LOCAL.get();
+		if (user == null) {
+			return null;
+		}
+		try {
+			return "当前登录用户信息：\n" + objectMapper.writeValueAsString(user);
+		} catch (JsonProcessingException e) {
+			return null;
+		}
+	}
+
+	public static String joinCurrentUserText(String outText) {
+		String currentUserText = getCurrentUserText();
+		if (outText == null) {
+			return currentUserText;
+		}
+		return outText + "\n" + currentUserText;
 	}
 
 	public static void write(ServerWebExchange exchange, JwtUser user) {

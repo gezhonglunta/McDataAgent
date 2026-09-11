@@ -34,12 +34,17 @@ import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.BooleanUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.ai.chat.prompt.PromptTemplate;
+import org.springframework.ai.converter.BeanOutputConverter;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Collectors;
-import org.springframework.ai.converter.BeanOutputConverter;
 
 import static com.alibaba.cloud.ai.dataagent.util.ReportTemplateUtil.cleanJsonExample;
 
@@ -125,6 +130,8 @@ public class PromptHelper {
 		params.put("evidence", sqlGenerationDTO.getEvidence());
 		params.put("execution_description", sqlGenerationDTO.getExecutionDescription());
 		params.put("previous_step_results", StringUtils.defaultIfBlank(sqlGenerationDTO.getPreviousStepResults(), "无"));
+		params.put("current_login_user", "");
+		params.put("sql_security_description", "");
 		return PromptConstant.getNewSqlGeneratorPromptTemplate().render(params);
 	}
 
@@ -179,6 +186,8 @@ public class PromptHelper {
 		params.put("error_message", sqlGenerationDTO.getExceptionMessage());
 		params.put("execution_description", sqlGenerationDTO.getExecutionDescription());
 		params.put("previous_step_results", StringUtils.defaultIfBlank(sqlGenerationDTO.getPreviousStepResults(), "无"));
+		params.put("current_login_user", "");
+		params.put("sql_security_description", "");
 
 		return PromptConstant.getSqlErrorFixerPromptTemplate().render(params);
 	}
