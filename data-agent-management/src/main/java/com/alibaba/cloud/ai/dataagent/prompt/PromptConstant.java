@@ -101,7 +101,7 @@ public class PromptConstant {
 	}
 
 	public static PromptTemplate getSqlSecurityDescriptionPromptTemplate() {
-		return new PromptTemplate(PromptLoader.loadPrompt("sql-security-description.txt"));
+		return new PromptTemplate(PromptLoader.loadPrompt("sql-security-description"));
 	}
 
 }
